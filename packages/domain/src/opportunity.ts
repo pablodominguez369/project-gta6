@@ -91,6 +91,11 @@ function mentions(text: string, terms: readonly string[]): boolean {
   return terms.some((term) => normalized.includes(` ${term} `));
 }
 
+/** Whether a text mentions leak or spoiler vocabulary (whole words, accents ignored). */
+export function findRiskTerms(text: string): { readonly leak: boolean; readonly spoiler: boolean } {
+  return { leak: mentions(text, LEAK_TERMS), spoiler: mentions(text, SPOILER_TERMS) };
+}
+
 export interface OpportunityAssessment {
   readonly certainty: ClaimCertainty;
   readonly score: number;

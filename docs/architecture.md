@@ -95,6 +95,24 @@ them. Because editors could write claims through the API directly, the script QA
 same check again on every claim a script cites; the database also refuses factual claims without a
 source and drops a verification when the claim or its sources change.
 
+### Scripts and automatic QA (T17)
+
+A script belongs to an accepted opportunity and is a list of lines (`hook`, `context`, `body`,
+`cta`), each with its spoken text, on-screen text and the claims it relies on
+(`scriptDraftSchema`, stored in `scripts.lines_json`). Editors can always write scripts by hand, so
+the product works with the LLM switched off.
+
+`runScriptQa` (`packages/domain/src/script.ts`) runs on every save and again when the script is sent
+to review; the stored `qa_report` is informative only and never trusted. Errors block review:
+
+- `context`/`body` lines without a claim, claims of another opportunity, claims whose sources do
+  not back them, factual claims not verified by a second person;
+- rumors, speculation or opinions used without saying so in the line;
+- links in the text (links only come from recorded sources), quotes that are not in a cited
+  claim, leak vocabulary, and a duration over the target (+10 %) or 60 s.
+
+Spoilers, a missing hook and a script much shorter than the target are warnings.
+
 ## Decisions
 
 - [ADR 0001](adr/0001-monolith-nextjs-supabase.md): Next.js + Supabase modular monolith
