@@ -1,4 +1,5 @@
 export * from "./channel";
+export * from "./claim-evidence";
 export * from "./editorial";
 export * from "./errors";
 export * from "./opportunity";

@@ -78,6 +78,23 @@ allowlisted feeds / manual URL -> sources (metadata + 300-char excerpt)
 Code: `packages/domain/src/opportunity.ts` (pure rules) and `packages/jobs/src/opportunities/`.
 The score orders what to look at first; only the certainty says what a script may state.
 
+### Claims with evidence (T15)
+
+An editor writes each claim on the opportunity page with its certainty, a "sensitive" flag and
+the sources behind it. `evaluateClaimEvidence` (`packages/domain/src/claim-evidence.ts`) decides
+whether the sources back the declared certainty:
+
+- `confirmed` needs an official/primary source; `reported` needs two independent reliable
+  publishers (or an official source).
+- A sensitive claim (dates, prices, people, health...) needs an official source or two reliable
+  publishers whatever its certainty; a single non-official source raises `sensitive_single_source`.
+- Factual claims need a dated source; rumors, speculation and opinion are always labelled.
+
+The web action refuses claims that fail the check, and a second editor (never the author) verifies
+them. Because editors could write claims through the API directly, the script QA (T17) runs the
+same check again on every claim a script cites; the database also refuses factual claims without a
+source and drops a verification when the claim or its sources change.
+
 ## Decisions
 
 - [ADR 0001](adr/0001-monolith-nextjs-supabase.md): Next.js + Supabase modular monolith

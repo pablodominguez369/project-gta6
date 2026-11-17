@@ -31,6 +31,9 @@ Rules enforced in SQL:
 - A feed can only be enabled once its terms URL and review date are recorded.
 - `sources.excerpt` holds at most 300 characters; the full third-party article is never stored.
 - A `confirmed` or `reported` claim must cite at least one source (checked at commit).
+  `create_claim(...)` (security invoker, RLS applies) writes a claim and its sources in one
+  transaction.
+- Changing a claim's text, certainty, sensitivity or sources clears its verification.
 - A script reaches `approved`, `rejected` or `changes_requested` only through an `approvals` row
   by someone other than its author, and only while it is `in_review`. Approvals are append-only.
 - `created_by` on claims and scripts cannot be changed after insert.

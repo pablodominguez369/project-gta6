@@ -806,6 +806,16 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      create_claim: {
+        Args: {
+          p_certainty: Database["public"]["Enums"]["claim_certainty"];
+          p_opportunity_id: string;
+          p_sensitive: boolean;
+          p_source_ids: string[];
+          p_text: string;
+        };
+        Returns: string;
+      };
       has_any_role: {
         Args: { required: Database["public"]["Enums"]["app_role"][] };
         Returns: boolean;
