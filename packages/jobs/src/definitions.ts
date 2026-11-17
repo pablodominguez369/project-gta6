@@ -16,6 +16,14 @@ export const QUEUES = {
     retryDelaySeconds: 10,
     expireInSeconds: 300,
   },
+  discoveryPoll: {
+    name: "discovery.poll",
+    // One poll run at a time; the next scheduled run retries failed feeds.
+    policy: "exclusive",
+    retryLimit: 0,
+    retryDelaySeconds: 60,
+    expireInSeconds: 600,
+  },
   systemPing: {
     name: "system.ping",
     policy: "standard",
@@ -34,3 +42,8 @@ export const systemPingPayloadSchema = z.object({
   requestedAt: z.iso.datetime(),
 });
 export type SystemPingPayload = z.infer<typeof systemPingPayloadSchema>;
+
+export const discoveryPollPayloadSchema = z.object({
+  requestedAt: z.iso.datetime(),
+});
+export type DiscoveryPollPayload = z.infer<typeof discoveryPollPayloadSchema>;

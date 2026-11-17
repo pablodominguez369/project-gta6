@@ -1,4 +1,5 @@
 export * from "./discovery/discovery-provider";
+export * from "./discovery/feed-discovery-provider";
 export * from "./llm/llm-provider";
 export * from "./publisher/publisher-adapter";
 export * from "./publisher/simulated-publisher";
