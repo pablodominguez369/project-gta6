@@ -34,7 +34,7 @@ export const webServerEnvSchema = baseEnvSchema.extend(publicEnvSchema.shape).ex
  * mode is rejected and the worker refuses to start.
  */
 export const workerEnvSchema = baseEnvSchema.extend({
-  NEXT_PUBLIC_SUPABASE_URL: z.url(),
+  SUPABASE_URL: z.url(),
   SUPABASE_SECRET_KEY: supabaseSecretKey,
   DATABASE_URL: z.url().refine((value) => /^postgres(ql)?:\/\//.test(value)),
   PUBLISHING_MODE: z.literal("simulated"),

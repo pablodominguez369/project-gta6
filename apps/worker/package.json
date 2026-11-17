@@ -1,0 +1,27 @@
+{
+  "name": "@gta6/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env.local src/main.ts",
+    "start": "tsx src/main.ts",
+    "enqueue:ping": "tsx --env-file-if-exists=.env.local src/scripts/enqueue-ping.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@gta6/config": "workspace:*",
+    "@gta6/db": "workspace:*",
+    "@gta6/domain": "workspace:*",
+    "@gta6/jobs": "workspace:*",
+    "@gta6/observability": "workspace:*",
+    "tsx": "4.23.15"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "6.0.3",
+    "vitest": "5.1.0"
+  }
+}

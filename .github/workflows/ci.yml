@@ -51,6 +51,8 @@ jobs:
       # Applies every migration from scratch, then runs the pgTAP suite in supabase/tests.
       - run: pnpm db:start
       - run: pnpm db:test
+      - name: Queue integration tests (pg-boss against local Postgres)
+        run: pnpm --filter @gta6/jobs test:integration
       - name: Generated types match the migrations
         run: |
           pnpm db:types
@@ -98,6 +100,20 @@ jobs:
           for i in $(seq 1 60); do curl -sf -o /dev/null http://127.0.0.1:3000/login && exit 0; sleep 1; done
           cat web.log; exit 1
       - run: pnpm --filter @gta6/web test:e2e
+
+  worker-image:
+    name: Worker Docker image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -f apps/worker/Dockerfile -t gta6-worker:ci .
+      # The image must refuse to start without valid configuration (no env is passed here).
+      - name: Image refuses to start without configuration
+        run: |
+          if docker run --rm gta6-worker:ci; then
+            echo "worker started without configuration"; exit 1
+          fi
 
   secret-scan:
     name: Secret scan (gitleaks)
