@@ -1,0 +1,91 @@
+import { describe, expect, it } from "vitest";
+
+import { loadEnv, loadEnvOrThrow } from "../load-env.js";
+import { baseEnvSchema, publicEnvSchema, workerEnvSchema } from "../schemas.js";
+
+const FAKE_SERVICE_KEY = "fake-service-role-key-for-tests-only";
+const FAKE_DB_PASSWORD = "fake-db-password-for-tests";
+
+const validWorkerEnv = {
+  APP_ENV: "local",
+  LOG_LEVEL: "debug",
+  NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+  SUPABASE_SERVICE_ROLE_KEY: FAKE_SERVICE_KEY,
+  DATABASE_URL: `postgresql://postgres:${FAKE_DB_PASSWORD}@127.0.0.1:54322/postgres`,
+  PUBLISHING_MODE: "simulated",
+};
+
+describe("loadEnv", () => {
+  it("returns typed values for a valid environment", () => {
+    const result = loadEnv(workerEnvSchema, validWorkerEnv);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.PUBLISHING_MODE).toBe("simulated");
+      expect(result.value.LOG_LEVEL).toBe("debug");
+    }
+  });
+
+  it("applies defaults", () => {
+    const result = loadEnv(baseEnvSchema, { APP_ENV: "local" });
+
+    expect(result.ok && result.value.LOG_LEVEL).toBe("info");
+  });
+
+  it("names a missing required variable", () => {
+    const { DATABASE_URL: _omitted, ...withoutDb } = validWorkerEnv;
+    const result = loadEnv(workerEnvSchema, withoutDb);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("VALIDATION_FAILED");
+      expect(result.error.message).toContain("DATABASE_URL");
+      expect(result.error.details).toEqual({ variables: "DATABASE_URL" });
+    }
+  });
+
+  it("treats empty strings as missing", () => {
+    const result = loadEnv(baseEnvSchema, { APP_ENV: "" });
+
+    expect(!result.ok && result.error.message).toContain("APP_ENV");
+  });
+
+  it("never includes variable values in the error", () => {
+    const result = loadEnv(workerEnvSchema, {
+      ...validWorkerEnv,
+      APP_ENV: "not-a-real-env",
+      DATABASE_URL: `mysql://root:${FAKE_DB_PASSWORD}@db/app`,
+      SUPABASE_SERVICE_ROLE_KEY: "short",
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const serialized = JSON.stringify(result.error) + result.error.message;
+      expect(serialized).toContain("APP_ENV");
+      expect(serialized).toContain("DATABASE_URL");
+      expect(serialized).toContain("SUPABASE_SERVICE_ROLE_KEY");
+      expect(serialized).not.toContain("not-a-real-env");
+      expect(serialized).not.toContain(FAKE_DB_PASSWORD);
+      expect(serialized).not.toContain("short");
+    }
+  });
+
+  it("rejects any publishing mode other than simulated", () => {
+    const result = loadEnv(workerEnvSchema, { ...validWorkerEnv, PUBLISHING_MODE: "live" });
+
+    expect(!result.ok && result.error.message).toContain("PUBLISHING_MODE");
+  });
+
+  it("rejects an invalid public Supabase URL", () => {
+    const result = loadEnv(publicEnvSchema, {
+      NEXT_PUBLIC_SUPABASE_URL: "not a url",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "fake-anon-key-for-tests-only",
+    });
+
+    expect(!result.ok && result.error.message).toContain("NEXT_PUBLIC_SUPABASE_URL");
+  });
+
+  it("loadEnvOrThrow throws a DomainError on invalid input", () => {
+    expect(() => loadEnvOrThrow(baseEnvSchema, {})).toThrow(/APP_ENV/);
+  });
+});
