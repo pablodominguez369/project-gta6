@@ -6,6 +6,8 @@ insert into auth.users (id, email, aud, role) values
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'only-admin@example.test', 'authenticated', 'authenticated'),
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'second-admin@example.test', 'authenticated', 'authenticated');
 insert into public.user_roles (user_id, role) values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'admin');
+-- Make the test independent of admins already present locally (rolled back at the end).
+delete from public.user_roles where user_id <> 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 select throws_ok(
   $$delete from public.user_roles where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and role = 'admin'$$,

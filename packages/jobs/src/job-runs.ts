@@ -1,4 +1,4 @@
-import { DomainError, isDomainError } from "@gta6/domain";
+import { BLOCKING_CODES, DomainError, isDomainError, type ErrorCode } from "@gta6/domain";
 import type { TypedSupabaseClient } from "@gta6/db";
 import type { Logger } from "@gta6/observability";
 
@@ -9,7 +9,18 @@ export interface JobRunContext {
   readonly jobRunId: string | null;
 }
 
-export type TrackedJobHandler<T> = (job: QueuedJob<T>, context: JobRunContext) => Promise<void>;
+/**
+ * What a handler can report without throwing. Throwing means "retry this attempt"; returning a
+ * blocked/failed outcome records it and ends the job without a queue retry.
+ */
+export type JobOutcome =
+  | { readonly status: "succeeded" }
+  | { readonly status: "blocked" | "failed"; readonly errorCode: ErrorCode };
+
+export type TrackedJobHandler<T> = (
+  job: QueuedJob<T>,
+  context: JobRunContext,
+) => Promise<JobOutcome | undefined>;
 
 export interface TrackOptions {
   readonly targetType?: string;
@@ -64,12 +75,17 @@ export function trackJobRuns<T>(
 
     logger.info("job started");
     try {
-      await handler(job, { logger, jobRunId });
-      await finish("succeeded");
-      logger.info("job succeeded");
+      const outcome = (await handler(job, { logger, jobRunId })) ?? { status: "succeeded" };
+      if (outcome.status === "succeeded") {
+        await finish("succeeded");
+        logger.info("job succeeded");
+      } else {
+        await finish(outcome.status, outcome.errorCode);
+        logger.warn({ errorCode: outcome.errorCode }, `job ${outcome.status}`);
+      }
     } catch (error) {
       const code = isDomainError(error) ? error.code : "INTERNAL";
-      const blocked = code === "SYSTEM_PAUSED" || code === "CHANNEL_PAUSED";
+      const blocked = isDomainError(error) && BLOCKING_CODES.has(error.code);
       await finish(blocked ? "blocked" : "failed", code);
       logger.warn({ errorCode: code, err: error }, "job failed");
       throw error instanceof Error ? error : new DomainError("INTERNAL", "Job failed");

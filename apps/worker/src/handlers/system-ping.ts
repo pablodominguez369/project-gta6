@@ -9,5 +9,5 @@ export const handleSystemPing: TrackedJobHandler<unknown> = (job, { logger }) =>
   }
   const latencyMs = Date.now() - Date.parse(payload.data.requestedAt);
   logger.info({ latencyMs }, "pong");
-  return Promise.resolve();
+  return Promise.resolve({ status: "succeeded" });
 };
