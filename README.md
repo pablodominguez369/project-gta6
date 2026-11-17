@@ -30,11 +30,21 @@ pnpm typecheck
 pnpm test
 ```
 
+## Database
+
+See [docs/database.md](docs/database.md). Quick start:
+
+```bash
+pnpm db:start   # requires Docker
+pnpm db:test
+```
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request and on pushes to `main`:
 
 - `checks`: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`.
+- `database`: starts a local Supabase Postgres, applies all migrations and runs the pgTAP suite.
 - `secret-scan`: gitleaks (pinned version, checksum-verified) over the full git history, using
   `.gitleaks.toml` (default rules plus Supabase key rules). Any finding fails the build.
 
@@ -52,5 +62,8 @@ If a real secret is ever committed: rotate it first, then purge it from history.
 apps/            # web (Next.js) and worker (Node) - added in later Phase 1 tasks
 packages/
   domain/        # entities, errors, Result type, pure policies
-docs/            # spec, architecture, ADRs, runbooks
+  config/        # typed environment loading
+  observability/ # logger with secret redaction
+supabase/        # SQL migrations, pgTAP tests, local seed
+docs/            # spec, architecture, database, ADRs, runbooks
 ```
