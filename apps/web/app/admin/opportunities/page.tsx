@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { ActionForm } from "@/components/action-form";
 import { TextInput } from "@/components/field";
 import { requireRole } from "@/lib/auth/require-role";
@@ -59,7 +61,11 @@ export default async function OpportunitiesPage() {
             data-testid={`opportunity-${opportunity.id}`}
           >
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="font-medium">{opportunity.topic}</h2>
+              <h2 className="font-medium">
+                <Link href={`/admin/opportunities/${opportunity.id}`} className="hover:underline">
+                  {opportunity.topic}
+                </Link>
+              </h2>
               <span className="text-sm">
                 {STATUS_LABELS[opportunity.status] ?? opportunity.status} · {opportunity.score}/100
               </span>
