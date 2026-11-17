@@ -88,4 +88,37 @@ describe("loadEnv", () => {
   it("loadEnvOrThrow throws a DomainError on invalid input", () => {
     expect(() => loadEnvOrThrow(baseEnvSchema, {})).toThrow(/APP_ENV/);
   });
+
+  it("keeps the LLM disabled by default", () => {
+    const result = loadEnv(workerEnvSchema, validWorkerEnv);
+    expect(result.ok && result.value.LLM_PROVIDER).toBe("disabled");
+  });
+
+  it("requires a secret reference for the real LLM, never a raw key", () => {
+    const missing = loadEnv(workerEnvSchema, { ...validWorkerEnv, LLM_PROVIDER: "anthropic" });
+    expect(!missing.ok && missing.error.message).toContain("LLM_API_KEY_REF");
+
+    const rawKey = loadEnv(workerEnvSchema, {
+      ...validWorkerEnv,
+      LLM_PROVIDER: "anthropic",
+      LLM_API_KEY_REF: "not a reference",
+    });
+    expect(rawKey.ok).toBe(false);
+
+    const ok = loadEnv(workerEnvSchema, {
+      ...validWorkerEnv,
+      LLM_PROVIDER: "anthropic",
+      LLM_API_KEY_REF: "env://ANTHROPIC_API_KEY",
+    });
+    expect(ok.ok).toBe(true);
+  });
+
+  it("only allows the fake LLM locally", () => {
+    const result = loadEnv(workerEnvSchema, {
+      ...validWorkerEnv,
+      APP_ENV: "production",
+      LLM_PROVIDER: "fake",
+    });
+    expect(!result.ok && result.error.message).toContain("LLM_PROVIDER");
+  });
 });
