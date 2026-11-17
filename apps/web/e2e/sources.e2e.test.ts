@@ -93,7 +93,7 @@ describe("sources", () => {
     expect(feed?.enabled).toBe(false);
 
     await page.reload();
-    const row = page.getByTestId(`feed-${feed?.id ?? ""}`);
+    const row = page.getByTestId(`feed-${String(feed?.id)}`);
     await row.getByLabel("URL de los términos de uso").fill("https://feeds.example.test/terms");
     await row.getByLabel("He revisado que los términos permiten el uso automatizado").check();
     await row.getByRole("button", { name: "Activar" }).click();
