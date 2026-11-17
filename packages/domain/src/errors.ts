@@ -15,6 +15,8 @@ export const ERROR_CODES = [
   "EXTERNAL_UNAVAILABLE",
   "CREDENTIAL_EXPIRED",
   "INTERNAL",
+  /** The model provider declined the request (safety refusal). Not retried automatically. */
+  "CONTENT_REFUSED",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

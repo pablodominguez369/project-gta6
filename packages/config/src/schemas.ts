@@ -33,12 +33,48 @@ export const webServerEnvSchema = baseEnvSchema.extend(publicEnvSchema.shape).ex
  * Worker variables. In Phase 1 only the simulated publisher exists, so any other publishing
  * mode is rejected and the worker refuses to start.
  */
-export const workerEnvSchema = baseEnvSchema.extend({
-  SUPABASE_URL: z.url(),
-  SUPABASE_SECRET_KEY: supabaseSecretKey,
-  DATABASE_URL: z.url().refine((value) => /^postgres(ql)?:\/\//.test(value)),
-  PUBLISHING_MODE: z.literal("simulated"),
-});
+export const LLM_PROVIDERS = ["disabled", "fake", "anthropic"] as const;
+
+export const workerEnvSchema = baseEnvSchema
+  .extend({
+    SUPABASE_URL: z.url(),
+    SUPABASE_SECRET_KEY: supabaseSecretKey,
+    DATABASE_URL: z.url().refine((value) => /^postgres(ql)?:\/\//.test(value)),
+    PUBLISHING_MODE: z.literal("simulated"),
+    /**
+     * LLM used to draft scripts. "disabled" (default): no call leaves the worker. "fake": canned
+     * answers, local only. "anthropic": real calls, still blocked while the spend limits are 0.
+     */
+    LLM_PROVIDER: z.enum(LLM_PROVIDERS).default("disabled"),
+    LLM_MODEL: z
+      .string()
+      .regex(/^claude-[a-z0-9-]+$/)
+      .optional(),
+    /** Secret reference (e.g. env://ANTHROPIC_API_KEY), never the key itself. */
+    LLM_API_KEY_REF: z
+      .string()
+      .regex(
+        /^[a-z][a-z0-9+.-]*:\/\/[A-Za-z0-9._/-]+$/,
+        "must be a secret reference like env://NAME",
+      )
+      .optional(),
+  })
+  .superRefine((env, ctx) => {
+    if (env.LLM_PROVIDER === "anthropic" && !env.LLM_API_KEY_REF) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["LLM_API_KEY_REF"],
+        message: "required when LLM_PROVIDER=anthropic",
+      });
+    }
+    if (env.LLM_PROVIDER === "fake" && env.APP_ENV !== "local") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["LLM_PROVIDER"],
+        message: "the fake LLM is only allowed when APP_ENV=local",
+      });
+    }
+  });
 
 export type BaseEnv = z.infer<typeof baseEnvSchema>;
 export type PublicEnv = z.infer<typeof publicEnvSchema>;

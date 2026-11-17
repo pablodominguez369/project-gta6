@@ -3,13 +3,21 @@
 All external providers sit behind interfaces in `packages/connectors`. The domain never imports a
 vendor SDK directly.
 
-| Interface           | Phase 1 implementation                   | Status                       |
-| ------------------- | ---------------------------------------- | ---------------------------- |
-| `PublisherAdapter`  | `SimulatedPublisher`                     | Implemented, contract-tested |
-| `LlmProvider`       | none                                     | Contract only (Phase 2)      |
-| `TtsProvider`       | none                                     | Contract only (Phase 3)      |
-| `DiscoveryProvider` | `FeedDiscoveryProvider` (RSS 2.0 / Atom) | Allowlisted feeds only       |
-| `SecretStore`       | `EnvSecretStore` (local only)            | Implemented                  |
+| Interface           | Phase 1 implementation                    | Status                       |
+| ------------------- | ----------------------------------------- | ---------------------------- |
+| `PublisherAdapter`  | `SimulatedPublisher`                      | Implemented, contract-tested |
+| `LlmProvider`       | `FakeLlmProvider`, `AnthropicLlmProvider` | Off by default, spend-gated  |
+| `TtsProvider`       | none                                      | Contract only (Phase 3)      |
+| `DiscoveryProvider` | `FeedDiscoveryProvider` (RSS 2.0 / Atom)  | Allowlisted feeds only       |
+| `SecretStore`       | `EnvSecretStore` (local only)             | Implemented                  |
+
+## LLM (Phase 2)
+
+See [ADR 0004](adr/0004-llm-provider-and-spend-gate.md). `LLM_PROVIDER=disabled` by default; even
+with `anthropic`, every call is refused while the spend limits are 0. Calls only happen through
+`generateWithSpendGate` in the worker, which records each one in `llm_usage` (no prompts or
+outputs). Confirmed capabilities used: Messages API, structured JSON output, server-side refusal
+fallback. External dependency: an Anthropic API key and account with billing, owned by the owner.
 
 ## Discovery (Phase 2)
 

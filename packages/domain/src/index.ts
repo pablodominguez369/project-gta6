@@ -7,3 +7,4 @@ export * from "./publication";
 export * from "./result";
 export * from "./roles";
 export * from "./source-normalization";
+export * from "./spend";
