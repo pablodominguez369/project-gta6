@@ -6,5 +6,6 @@ export * from "./opportunity";
 export * from "./publication";
 export * from "./result";
 export * from "./roles";
+export * from "./script";
 export * from "./source-normalization";
 export * from "./spend";

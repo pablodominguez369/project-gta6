@@ -14,6 +14,7 @@ import {
 import { formatDateTime } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { createScript } from "../../scripts/actions";
 import { createClaim, verifyClaim } from "./actions";
 
 const SOURCE_COLUMNS = `${EVIDENCE_SOURCE_COLUMNS}, title, url`;
@@ -69,6 +70,17 @@ export default async function OpportunityPage({
           Cada afirmación necesita fuentes, fecha y nivel de certeza. Los rumores se etiquetan
           siempre. Otra persona distinta de quien la escribe la verifica.
         </p>
+        {canEdit && opportunity.status === "accepted" ? (
+          <form action={createScript} className="mt-3">
+            <input type="hidden" name="opportunityId" value={opportunity.id} />
+            <button
+              type="submit"
+              className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-neutral-100 dark:text-neutral-900"
+            >
+              Nuevo guion
+            </button>
+          </form>
+        ) : null}
       </div>
 
       <div>

@@ -1,4 +1,11 @@
-import type { ClaimEvidenceSource, SourceType } from "@gta6/domain";
+import {
+  evaluateClaimEvidence,
+  type ClaimEvidenceSource,
+  type ScriptClaim,
+  type SourceType,
+} from "@gta6/domain";
+
+import type { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /** Source columns needed to judge a claim's evidence. */
 export const EVIDENCE_SOURCE_COLUMNS =
@@ -33,3 +40,30 @@ export const CERTAINTY_OPTIONS = [
 export const CERTAINTY_LABELS: Readonly<Record<string, string>> = Object.fromEntries(
   CERTAINTY_OPTIONS.map((option) => [option.value, option.label]),
 );
+
+type ServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+
+/** Claims of an opportunity in the shape the script QA needs, evidence evaluated server-side. */
+export async function loadScriptClaims(
+  supabase: ServerClient,
+  opportunityId: string,
+): Promise<ScriptClaim[]> {
+  const { data } = await supabase
+    .from("claims")
+    .select(
+      `id, text, certainty, sensitive, verified_at, claim_sources(sources(${EVIDENCE_SOURCE_COLUMNS}))`,
+    )
+    .eq("opportunity_id", opportunityId)
+    .order("created_at");
+  return (data ?? []).map((claim) => ({
+    id: claim.id,
+    text: claim.text,
+    certainty: claim.certainty,
+    verified: claim.verified_at !== null,
+    evidence: evaluateClaimEvidence({
+      certainty: claim.certainty,
+      sensitive: claim.sensitive,
+      sources: claim.claim_sources.map(({ sources }) => toEvidenceSource(sources)),
+    }),
+  }));
+}
