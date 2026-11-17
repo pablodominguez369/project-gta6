@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 import type { AppRole } from "@gta6/domain";
 import { createClient } from "@supabase/supabase-js";
+import type { Page } from "playwright";
 
 /** Loads apps/web/.env.local without printing anything. Shell variables take precedence. */
 function loadLocalEnv(): void {
@@ -89,7 +90,7 @@ export async function deleteTestUser(user: TestUser): Promise<void> {
 }
 
 export async function signIn(
-  page: import("playwright").Page,
+  page: Page,
   user: Pick<TestUser, "email" | "password">,
 ): Promise<void> {
   await page.goto(`${baseUrl}/login`);

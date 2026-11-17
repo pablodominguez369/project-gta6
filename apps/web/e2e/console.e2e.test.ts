@@ -44,7 +44,7 @@ describe("admin console", () => {
     const page = await adminPage();
     await page.goto(`${baseUrl}/admin/controls`);
 
-    const reason = `e2e pause ${Date.now()}`;
+    const reason = `e2e pause ${String(Date.now())}`;
     await page.getByTestId("pause-form").getByLabel("Motivo").fill(reason);
     await page.getByRole("button", { name: "Pausa global" }).click();
     await page.getByText("Sistema en pausa.").waitFor();
@@ -70,7 +70,7 @@ describe("admin console", () => {
     const page = await adminPage();
     await page.goto(`${baseUrl}/admin/channels`);
 
-    const name = `Canal e2e ${Date.now()}`;
+    const name = `Canal e2e ${String(Date.now())}`;
     await page.getByLabel("Nombre").fill(name);
     await page.getByRole("button", { name: "Crear canal" }).click();
     await page.getByText("Canal creado en modo draft.").waitFor();
