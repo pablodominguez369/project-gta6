@@ -31,6 +31,16 @@ export const QUEUES = {
     retryDelaySeconds: 30,
     expireInSeconds: 300,
   },
+  scriptDraft: {
+    name: "script.draft",
+    // One queued-or-active job per request (singletonKey = request id). No queue retries: the
+    // handler records blocked/failed itself and the dispatcher retries blocked requests later,
+    // always through the spend gate.
+    policy: "exclusive",
+    retryLimit: 0,
+    retryDelaySeconds: 60,
+    expireInSeconds: 600,
+  },
   systemPing: {
     name: "system.ping",
     policy: "standard",
@@ -54,3 +64,8 @@ export const discoveryPollPayloadSchema = z.object({
   requestedAt: z.iso.datetime(),
 });
 export type DiscoveryPollPayload = z.infer<typeof discoveryPollPayloadSchema>;
+
+export const scriptDraftPayloadSchema = z.object({
+  requestId: z.uuid(),
+});
+export type ScriptDraftPayload = z.infer<typeof scriptDraftPayloadSchema>;

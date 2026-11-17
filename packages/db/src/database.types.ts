@@ -593,6 +593,64 @@ export type Database = {
           },
         ];
       };
+      script_requests: {
+        Row: {
+          created_at: string;
+          error_code: string | null;
+          id: string;
+          locale: string;
+          next_attempt_at: string | null;
+          opportunity_id: string;
+          requested_by: string | null;
+          script_id: string | null;
+          status: Database["public"]["Enums"]["script_request_status"];
+          target_duration_s: number;
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          error_code?: string | null;
+          id?: string;
+          locale?: string;
+          next_attempt_at?: string | null;
+          opportunity_id: string;
+          requested_by?: string | null;
+          script_id?: string | null;
+          status?: Database["public"]["Enums"]["script_request_status"];
+          target_duration_s?: number;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          error_code?: string | null;
+          id?: string;
+          locale?: string;
+          next_attempt_at?: string | null;
+          opportunity_id?: string;
+          requested_by?: string | null;
+          script_id?: string | null;
+          status?: Database["public"]["Enums"]["script_request_status"];
+          target_duration_s?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "script_requests_opportunity_id_fkey";
+            columns: ["opportunity_id"];
+            isOneToOne: false;
+            referencedRelation: "opportunities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "script_requests_script_id_fkey";
+            columns: ["script_id"];
+            isOneToOne: false;
+            referencedRelation: "scripts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       scripts: {
         Row: {
           created_at: string;
@@ -835,6 +893,7 @@ export type Database = {
       platform: "youtube" | "instagram" | "tiktok" | "simulated";
       publication_status:
         "queued" | "in_progress" | "succeeded" | "failed" | "ambiguous" | "blocked";
+      script_request_status: "queued" | "running" | "succeeded" | "blocked" | "failed";
       script_status: "draft" | "in_review" | "changes_requested" | "approved" | "rejected";
       source_type: "official" | "press" | "community" | "social";
     };
@@ -961,6 +1020,7 @@ export const Constants = {
       opportunity_status: ["new", "shortlisted", "accepted", "discarded", "expired"],
       platform: ["youtube", "instagram", "tiktok", "simulated"],
       publication_status: ["queued", "in_progress", "succeeded", "failed", "ambiguous", "blocked"],
+      script_request_status: ["queued", "running", "succeeded", "blocked", "failed"],
       script_status: ["draft", "in_review", "changes_requested", "approved", "rejected"],
       source_type: ["official", "press", "community", "social"],
     },

@@ -4,6 +4,7 @@ import {
   OPPORTUNITY_STATUSES,
   PLATFORMS,
   PUBLICATION_STATUSES,
+  SCRIPT_REQUEST_STATUSES,
   SCRIPT_STATUSES,
   SOURCE_TYPES,
 } from "@gta6/domain";
@@ -24,6 +25,7 @@ describe("domain enums match the database", () => {
     ["claim_certainty", CLAIM_CERTAINTIES, db.claim_certainty],
     ["opportunity_status", OPPORTUNITY_STATUSES, db.opportunity_status],
     ["script_status", SCRIPT_STATUSES, db.script_status],
+    ["script_request_status", SCRIPT_REQUEST_STATUSES, db.script_request_status],
   ] as const)("%s", (_name, domain, database) => {
     expect([...domain]).toEqual([...database]);
   });

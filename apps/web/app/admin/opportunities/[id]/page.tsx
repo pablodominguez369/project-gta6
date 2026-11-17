@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ActionForm } from "@/components/action-form";
-import { Field, Select } from "@/components/field";
+import { Field, Select, TextInput } from "@/components/field";
 import { requireRole } from "@/lib/auth/require-role";
 import {
   CERTAINTY_LABELS,
@@ -12,9 +12,15 @@ import {
   toEvidenceSource,
 } from "@/lib/claims";
 import { formatDateTime } from "@/lib/format";
+import {
+  LOCALE_OPTIONS,
+  REQUEST_ERROR_LABELS,
+  REQUEST_STATUS_LABELS,
+  SCRIPT_STATUS_LABELS,
+} from "@/lib/scripts";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-import { createScript } from "../../scripts/actions";
+import { createScript, requestAiDraft } from "../../scripts/actions";
 import { createClaim, verifyClaim } from "./actions";
 
 const SOURCE_COLUMNS = `${EVIDENCE_SOURCE_COLUMNS}, title, url`;
@@ -36,21 +42,33 @@ export default async function OpportunityPage({
     .maybeSingle();
   if (!opportunity) notFound();
 
-  const [{ data: claims }, { data: manualSources }] = await Promise.all([
-    supabase
-      .from("claims")
-      .select(
-        `id, text, certainty, sensitive, created_by, verified_at, claim_sources(sources(${SOURCE_COLUMNS}))`,
-      )
-      .eq("opportunity_id", id)
-      .order("created_at"),
-    supabase
-      .from("sources")
-      .select(SOURCE_COLUMNS)
-      .is("feed_source_id", null)
-      .order("observed_at", { ascending: false })
-      .limit(20),
-  ]);
+  const [{ data: claims }, { data: manualSources }, { data: scripts }, { data: requests }] =
+    await Promise.all([
+      supabase
+        .from("claims")
+        .select(
+          `id, text, certainty, sensitive, created_by, verified_at, claim_sources(sources(${SOURCE_COLUMNS}))`,
+        )
+        .eq("opportunity_id", id)
+        .order("created_at"),
+      supabase
+        .from("sources")
+        .select(SOURCE_COLUMNS)
+        .is("feed_source_id", null)
+        .order("observed_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("scripts")
+        .select("id, version, status, prompt_version")
+        .eq("opportunity_id", id)
+        .order("version"),
+      supabase
+        .from("script_requests")
+        .select("id, status, error_code, created_at")
+        .eq("opportunity_id", id)
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
 
   const opportunitySources = opportunity.opportunity_sources.map(({ sources }) => sources);
   const linkedIds = new Set(opportunitySources.map((source) => source.id));
@@ -71,17 +89,66 @@ export default async function OpportunityPage({
           siempre. Otra persona distinta de quien la escribe la verifica.
         </p>
         {canEdit && opportunity.status === "accepted" ? (
-          <form action={createScript} className="mt-3">
-            <input type="hidden" name="opportunityId" value={opportunity.id} />
-            <button
-              type="submit"
-              className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-neutral-100 dark:text-neutral-900"
-            >
-              Nuevo guion
-            </button>
-          </form>
+          <div className="mt-3 flex flex-wrap items-start gap-6">
+            <form action={createScript}>
+              <input type="hidden" name="opportunityId" value={opportunity.id} />
+              <button
+                type="submit"
+                className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-neutral-100 dark:text-neutral-900"
+              >
+                Nuevo guion
+              </button>
+            </form>
+            <ActionForm action={requestAiDraft} submitLabel="Redactar con IA" testId="ai-draft">
+              <input type="hidden" name="opportunityId" value={opportunity.id} />
+              <div className="flex flex-wrap gap-3">
+                <Field label="Idioma">
+                  <Select name="locale" options={LOCALE_OPTIONS} defaultValue="es-ES" />
+                </Field>
+                <Field label="Duración (s)">
+                  <TextInput
+                    name="targetDurationS"
+                    type="number"
+                    min={20}
+                    max={60}
+                    defaultValue={45}
+                  />
+                </Field>
+              </div>
+            </ActionForm>
+          </div>
         ) : null}
       </div>
+
+      {(scripts ?? []).length > 0 || (requests ?? []).length > 0 ? (
+        <div>
+          <h2 className="font-medium">Guiones</h2>
+          <ul className="mt-2 list-disc pl-5 text-sm">
+            {(scripts ?? []).map((script) => (
+              <li key={script.id}>
+                <Link href={`/admin/scripts/${script.id}`} className="underline">
+                  Guion v{script.version}
+                </Link>{" "}
+                <span className="text-neutral-500">
+                  {SCRIPT_STATUS_LABELS[script.status] ?? script.status}
+                  {script.prompt_version ? " · borrador de IA" : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <ul className="mt-2 flex flex-col gap-1 text-sm" data-testid="ai-requests">
+            {(requests ?? []).map((request) => (
+              <li key={request.id}>
+                Borrador con IA ({formatDateTime(request.created_at)}):{" "}
+                {REQUEST_STATUS_LABELS[request.status] ?? request.status}
+                {request.error_code
+                  ? `. ${REQUEST_ERROR_LABELS[request.error_code] ?? request.error_code}`
+                  : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div>
         <h2 className="font-medium">Afirmaciones</h2>

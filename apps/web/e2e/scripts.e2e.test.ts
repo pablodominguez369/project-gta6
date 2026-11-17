@@ -110,4 +110,23 @@ describe("scripts", () => {
     expect(script?.lines_json).toHaveLength(2);
     await page.close();
   });
+
+  it("an editor asks for an AI draft; only a queued request is written", async () => {
+    const page = await browser.newPage();
+    await signIn(page, author);
+    await page.waitForURL(`${baseUrl}/admin`);
+    await page.goto(`${baseUrl}/admin/opportunities/${opportunityId}`);
+    await page.getByTestId("ai-draft").getByRole("button", { name: "Redactar con IA" }).click();
+    await page
+      .getByTestId("ai-requests")
+      .getByText(/En cola/)
+      .waitFor();
+
+    const { data: requests } = await adminClient
+      .from("script_requests")
+      .select("status, requested_by")
+      .eq("opportunity_id", opportunityId);
+    expect(requests).toEqual([{ status: "queued", requested_by: author.id }]);
+    await page.close();
+  });
 });

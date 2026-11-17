@@ -113,6 +113,22 @@ to review; the stored `qa_report` is informative only and never trusted. Errors 
 
 Spoilers, a missing hook and a script much shorter than the target are warnings.
 
+### AI drafts (T17)
+
+```text
+editor clicks "Redactar con IA" -> script_requests (queued; one open request per opportunity)
+  -> worker dispatcher (10 s) -> script.draft job
+  -> only claims the QA accepts (evidence ok, factual ones verified) go into the prompt
+  -> generateWithSpendGate (blocked while limits are 0; rechecked every hour)
+  -> scriptDraftSchema + runScriptQa -> new draft version (prompt_version, llm_usage_id)
+```
+
+The prompt (`packages/jobs/src/scripts/script-prompt.ts`, versioned) carries claim ids and texts
+written by editors, never raw source excerpts, and tells the model to treat them as data. The
+draft is attributed to the editor who asked for it, so that editor cannot approve it. Rate limits,
+provider outages and timeouts leave the request blocked for 15 minutes; a refusal or an invalid
+answer fails it.
+
 ## Decisions
 
 - [ADR 0001](adr/0001-monolith-nextjs-supabase.md): Next.js + Supabase modular monolith

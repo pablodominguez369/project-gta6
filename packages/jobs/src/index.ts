@@ -6,3 +6,4 @@ export * from "./llm";
 export * from "./opportunities";
 export * from "./pg-boss-queue";
 export * from "./publishing";
+export * from "./scripts";
