@@ -46,7 +46,7 @@ before proposing changes. Product docs are in Spanish; code, identifiers and com
   `packages/domain/src/errors.ts`; never rename or reuse a code.
 - Validate every external input and output with Zod at the boundary.
 - Structured logs only (no `console.*`); sensitive fields are redacted.
-- `SUPABASE_SERVICE_ROLE_KEY` is server/worker only: never `NEXT_PUBLIC_*`, never imported from a
+- `SUPABASE_SECRET_KEY` (bypasses RLS) is server/worker only: never `NEXT_PUBLIC_*`, never imported from a
   client component.
 - Migrations are reviewable SQL, one concern per file, and enable RLS in the same migration that
   creates the table.

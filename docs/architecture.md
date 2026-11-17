@@ -24,7 +24,16 @@ Supabase Auth / Storage                     Connectors (simulated in Phase 1)
 | `packages/connectors`     | Provider interfaces and simulators                 | `domain`            |
 | `apps/web`, `apps/worker` | Composition only, no business rules                | any package         |
 
-Only `packages/domain` exists after T1; the rest are added by their Phase 1 tasks.
+Packages are added by their Phase 1 tasks; `db` and `jobs` arrive with T7/T8.
+
+## Authentication
+
+- Supabase Auth, email + password, sign-ups disabled. Keys: publishable (browser) and secret
+  (server/worker only, bypasses RLS).
+- `apps/web/proxy.ts` (Next 16 replacement for `middleware.ts`) refreshes the session with
+  `@supabase/ssr` and redirects anonymous users to `/login`.
+- `requireRole()` in pages and actions: no session → `/login`; missing role → HTTP 403.
+- RLS remains the source of truth: a bypassed UI check still cannot read or write data.
 
 ## Phase 1 vertical slice
 

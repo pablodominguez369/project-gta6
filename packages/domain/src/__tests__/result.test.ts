@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { err, isErr, isOk, mapResult, ok, unwrap } from "../result.js";
+import { err, isErr, isOk, mapResult, ok, unwrap } from "../result";
 
 describe("Result", () => {
   it("narrows Ok and Err", () => {

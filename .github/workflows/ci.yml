@@ -52,6 +52,49 @@ jobs:
       - run: pnpm db:start
       - run: pnpm db:test
 
+  e2e:
+    name: End-to-end (auth and role guards)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @gta6/web exec playwright install --with-deps chromium
+
+      - name: Start local Supabase (database, auth, REST only)
+        run: >-
+          pnpm supabase start
+          -x realtime,studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit,postgres-meta,storage-api
+
+      # Local Supabase keys are per-run development defaults, written to an ignored file and
+      # never echoed.
+      - name: Write apps/web/.env.local from the local stack
+        run: |
+          status="$(pnpm -s supabase status -o json)"
+          {
+            echo "APP_ENV=local"
+            echo "LOG_LEVEL=info"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$(jq -r .API_URL <<<"$status")"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$(jq -r .PUBLISHABLE_KEY <<<"$status")"
+            echo "SUPABASE_SECRET_KEY=$(jq -r .SECRET_KEY <<<"$status")"
+          } > apps/web/.env.local
+
+      - run: pnpm --filter @gta6/web build
+      - name: Start web server
+        run: |
+          pnpm --filter @gta6/web start > web.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf -o /dev/null http://127.0.0.1:3000/login && exit 0; sleep 1; done
+          cat web.log; exit 1
+      - run: pnpm --filter @gta6/web test:e2e
+
   secret-scan:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest

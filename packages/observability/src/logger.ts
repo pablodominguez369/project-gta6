@@ -1,6 +1,6 @@
 import { pino, type DestinationStream, type Level, type Logger } from "pino";
 
-import { redact, redactString } from "./redact.js";
+import { redact, redactString } from "./redact";
 
 export type { Logger } from "pino";
 
