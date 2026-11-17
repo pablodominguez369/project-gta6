@@ -11,17 +11,22 @@ export const baseEnvSchema = z.object({
 
 /**
  * Public variables, safe to expose to the browser. Only `NEXT_PUBLIC_*` names belong here.
- * Note: Supabase is introducing "publishable" keys; confirm the current variable name in the
- * Supabase docs when the project is created (see docs/architecture.md).
+ * Uses Supabase "publishable" keys (`sb_publishable_...`), which replace the legacy anon key.
  */
 export const publicEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20),
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(20),
 });
+
+/**
+ * Supabase secret key (`sb_secret_...`, replaces the legacy service_role key). It bypasses RLS,
+ * so it is only read by server code and the worker, never by the browser.
+ */
+const supabaseSecretKey = z.string().min(20);
 
 /** Server-only variables for the Next.js app. Never import this from client code. */
 export const webServerEnvSchema = baseEnvSchema.extend(publicEnvSchema.shape).extend({
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
+  SUPABASE_SECRET_KEY: supabaseSecretKey,
 });
 
 /**
@@ -30,7 +35,7 @@ export const webServerEnvSchema = baseEnvSchema.extend(publicEnvSchema.shape).ex
  */
 export const workerEnvSchema = baseEnvSchema.extend({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
+  SUPABASE_SECRET_KEY: supabaseSecretKey,
   DATABASE_URL: z.url().refine((value) => /^postgres(ql)?:\/\//.test(value)),
   PUBLISHING_MODE: z.literal("simulated"),
 });

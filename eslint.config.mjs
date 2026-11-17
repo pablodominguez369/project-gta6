@@ -1,12 +1,20 @@
 // @ts-check
 import js from "@eslint/js";
 import prettier from "eslint-config-prettier";
+import nextPlugin from "@next/eslint-plugin-next";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["**/node_modules/**", "**/dist/**", "**/.next/**", "**/.turbo/**", "**/coverage/**"],
+    ignores: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.next/**",
+      "**/.turbo/**",
+      "**/coverage/**",
+      "**/next-env.d.ts",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
@@ -27,6 +35,10 @@ export default tseslint.config(
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_", ignoreRestSiblings: true },
       ],
     },
+  },
+  {
+    files: ["apps/web/**/*.{ts,tsx}"],
+    ...nextPlugin.configs["core-web-vitals"],
   },
   {
     files: ["**/*.mjs", "**/*.js"],

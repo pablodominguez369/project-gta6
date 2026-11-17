@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DomainError, isDomainError } from "../errors.js";
+import { DomainError, isDomainError } from "../errors";
 
 describe("DomainError", () => {
   it("keeps code, message and safe details", () => {

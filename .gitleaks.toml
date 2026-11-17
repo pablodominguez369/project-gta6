@@ -14,7 +14,7 @@ keywords = ["sb_secret_"]
 
 [[rules]]
 id = "supabase-service-role-assignment"
-description = "Supabase service role key assigned in code or env files"
-regex = '''(?i)SUPABASE_SERVICE_ROLE_KEY\s*[:=]\s*["']?(eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})'''
+description = "Supabase service role / secret key assigned in code or env files"
+regex = '''(?i)SUPABASE_(SERVICE_ROLE|SECRET)_KEY\s*[:=]\s*["']?(eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})'''
 secretGroup = 1
 keywords = ["supabase_service_role_key"]

@@ -26,5 +26,5 @@ Supabase and Vercel, and Phase 1 must stay small and operable by one person.
 - One deployment target for the UI and API; fewer moving parts.
 - No ORM: queries go through the Supabase client or SQL, typed from generated types.
 - RLS is the main data-access control, so every table needs policy tests (pgTAP).
-- The service role key must stay server-side only; enforced by lint rules, `server-only` imports and
+- The Supabase secret key (bypasses RLS) must stay server-side only; enforced by lint rules, `server-only` imports and
   secret scanning.

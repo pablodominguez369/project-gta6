@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { REDACTED, redact, redactString } from "../redact.js";
+import { REDACTED, redact, redactString } from "../redact";
 
 // Fake values built at runtime so no secret-looking literal sits in the repository.
 const fakeJwt = ["eyJhbGciOiJIUzI1NiJ9", "eyJyb2xlIjoidGVzdCJ9", "c2lnbmF0dXJlLWZha2U"].join(".");

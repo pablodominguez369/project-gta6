@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { loadEnv, loadEnvOrThrow } from "../load-env.js";
-import { baseEnvSchema, publicEnvSchema, workerEnvSchema } from "../schemas.js";
+import { loadEnv, loadEnvOrThrow } from "../load-env";
+import { baseEnvSchema, publicEnvSchema, workerEnvSchema } from "../schemas";
 
 const FAKE_SERVICE_KEY = "fake-service-role-key-for-tests-only";
 const FAKE_DB_PASSWORD = "fake-db-password-for-tests";
@@ -10,7 +10,7 @@ const validWorkerEnv = {
   APP_ENV: "local",
   LOG_LEVEL: "debug",
   NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
-  SUPABASE_SERVICE_ROLE_KEY: FAKE_SERVICE_KEY,
+  SUPABASE_SECRET_KEY: FAKE_SERVICE_KEY,
   DATABASE_URL: `postgresql://postgres:${FAKE_DB_PASSWORD}@127.0.0.1:54322/postgres`,
   PUBLISHING_MODE: "simulated",
 };
@@ -55,7 +55,7 @@ describe("loadEnv", () => {
       ...validWorkerEnv,
       APP_ENV: "not-a-real-env",
       DATABASE_URL: `mysql://root:${FAKE_DB_PASSWORD}@db/app`,
-      SUPABASE_SERVICE_ROLE_KEY: "short",
+      SUPABASE_SECRET_KEY: "short",
     });
 
     expect(result.ok).toBe(false);
@@ -63,7 +63,7 @@ describe("loadEnv", () => {
       const serialized = JSON.stringify(result.error) + result.error.message;
       expect(serialized).toContain("APP_ENV");
       expect(serialized).toContain("DATABASE_URL");
-      expect(serialized).toContain("SUPABASE_SERVICE_ROLE_KEY");
+      expect(serialized).toContain("SUPABASE_SECRET_KEY");
       expect(serialized).not.toContain("not-a-real-env");
       expect(serialized).not.toContain(FAKE_DB_PASSWORD);
       expect(serialized).not.toContain("short");
@@ -79,7 +79,7 @@ describe("loadEnv", () => {
   it("rejects an invalid public Supabase URL", () => {
     const result = loadEnv(publicEnvSchema, {
       NEXT_PUBLIC_SUPABASE_URL: "not a url",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "fake-anon-key-for-tests-only",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "fake-publishable-key-for-tests",
     });
 
     expect(!result.ok && result.error.message).toContain("NEXT_PUBLIC_SUPABASE_URL");

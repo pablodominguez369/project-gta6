@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { createLogger, withRequestId } from "../logger.js";
-import { REDACTED } from "../redact.js";
+import { createLogger, withRequestId } from "../logger";
+import { REDACTED } from "../redact";
 
 const fakeJwt = ["eyJhbGciOiJIUzI1NiJ9", "eyJyb2xlIjoidGVzdCJ9", "c2lnbmF0dXJlLWZha2U"].join(".");
 

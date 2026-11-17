@@ -1,2 +1,2 @@
-export * from "./load-env.js";
-export * from "./schemas.js";
+export * from "./load-env";
+export * from "./schemas";

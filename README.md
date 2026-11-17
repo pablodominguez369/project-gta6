@@ -30,6 +30,22 @@ pnpm typecheck
 pnpm test
 ```
 
+## Web console (apps/web)
+
+Next.js 16 App Router. Sign-ups are disabled; create the first admin with
+[docs/runbooks/first-admin.md](docs/runbooks/first-admin.md).
+
+```bash
+pnpm supabase start                       # full local stack (needs Docker)
+pnpm supabase status -o env               # copy the URL and keys into apps/web/.env.local
+pnpm --filter @gta6/web dev               # http://127.0.0.1:3000
+pnpm --filter @gta6/web test:e2e          # needs the server running, see apps/web/e2e/README.md
+```
+
+Auth: `proxy.ts` refreshes the Supabase session on every request and sends anonymous users to
+`/login`. Pages and server actions call `requireRole(...)`, which answers 403 via `forbidden()`
+(experimental `authInterrupts` flag in Next 16) when the role is missing.
+
 ## Database
 
 See [docs/database.md](docs/database.md). Quick start:
@@ -44,6 +60,7 @@ pnpm db:test
 `.github/workflows/ci.yml` runs on every pull request and on pushes to `main`:
 
 - `checks`: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`.
+- `e2e`: starts Supabase (DB, Auth, REST), builds and starts the web app, runs the Playwright suite.
 - `database`: starts a local Supabase Postgres, applies all migrations and runs the pgTAP suite.
 - `secret-scan`: gitleaks (pinned version, checksum-verified) over the full git history, using
   `.gitleaks.toml` (default rules plus Supabase key rules). Any finding fails the build.
@@ -59,7 +76,9 @@ If a real secret is ever committed: rotate it first, then purge it from history.
 ## Workspace layout
 
 ```text
-apps/            # web (Next.js) and worker (Node) - added in later Phase 1 tasks
+apps/
+  web/           # Next.js admin console (auth, role guards)
+  worker/        # Node job worker - added in T8
 packages/
   domain/        # entities, errors, Result type, pure policies
   config/        # typed environment loading
