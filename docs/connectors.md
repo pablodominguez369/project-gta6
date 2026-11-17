@@ -3,13 +3,29 @@
 All external providers sit behind interfaces in `packages/connectors`. The domain never imports a
 vendor SDK directly.
 
-| Interface           | Phase 1 implementation        | Status                       |
-| ------------------- | ----------------------------- | ---------------------------- |
-| `PublisherAdapter`  | `SimulatedPublisher`          | Implemented, contract-tested |
-| `LlmProvider`       | none                          | Contract only (Phase 2)      |
-| `TtsProvider`       | none                          | Contract only (Phase 3)      |
-| `DiscoveryProvider` | none                          | Contract only (Phase 2)      |
-| `SecretStore`       | `EnvSecretStore` (local only) | Implemented                  |
+| Interface           | Phase 1 implementation                   | Status                       |
+| ------------------- | ---------------------------------------- | ---------------------------- |
+| `PublisherAdapter`  | `SimulatedPublisher`                     | Implemented, contract-tested |
+| `LlmProvider`       | none                                     | Contract only (Phase 2)      |
+| `TtsProvider`       | none                                     | Contract only (Phase 3)      |
+| `DiscoveryProvider` | `FeedDiscoveryProvider` (RSS 2.0 / Atom) | Allowlisted feeds only       |
+| `SecretStore`       | `EnvSecretStore` (local only)            | Implemented                  |
+
+## Discovery (Phase 2)
+
+`FeedDiscoveryProvider` reads one allowlisted RSS 2.0 or Atom feed. The worker job `discovery.poll`
+runs every 5 minutes and polls each enabled feed whose interval (15 to 1440 minutes) has passed.
+
+- An admin adds a feed in `/admin/sources`; it stays disabled until they record the terms URL and
+  confirm the terms allow automated use. Editors can also add single URLs by hand.
+- HTTPS only (redirects to HTTP are refused), 10 s timeout, 2 MB limit, at most 100 items per poll,
+  documents with a DTD are refused (entity expansion).
+- 401/403 means we lack access and is never worked around (rule 3). 429 and errors count as
+  failures; after 5 in a row the feed is disabled and `feed_sources.auto_disabled` is audited.
+- Stored per item: canonical URL (tracking parameters removed), title, dates, an excerpt of at most
+  300 characters, a SHA-256 hash. Never the full article.
+- User agent: generic `MediaFactoryFeedReader/0.1`, no personal data.
+- Nothing is polled while the global pause is on.
 
 ## Publisher contract
 

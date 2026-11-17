@@ -1,12 +1,14 @@
 import { SimulatedPublisher } from "@gta6/connectors";
 import { createAdminClient } from "@gta6/db";
 import {
+  createDiscoveryPollHandler,
   createPublishHandler,
   PgBossQueue,
   PgPublicationStore,
   PgSimulatedRemoteStore,
   publishSimulatedPayloadSchema,
   QUEUES,
+  scheduleDiscoveryPoll,
   startDispatcher,
   trackJobRuns,
   type JobQueue,
@@ -69,6 +71,13 @@ export async function startWorker(source: NodeJS.ProcessEnv = process.env): Prom
   );
   const dispatcher = startDispatcher(pool, queue, logger);
 
+  // Phase 2: allowlisted feeds only (admins enable a feed after reviewing its terms).
+  await queue.work(
+    QUEUES.discoveryPoll.name,
+    trackJobRuns(db, logger, createDiscoveryPollHandler(pool)),
+  );
+  const discoverySchedule = scheduleDiscoveryPoll(queue);
+
   logger.info({ queues: Object.values(QUEUES).map((q) => q.name) }, "worker started");
 
   return {
@@ -76,6 +85,7 @@ export async function startWorker(source: NodeJS.ProcessEnv = process.env): Prom
     logger,
     async stop() {
       logger.info("worker stopping");
+      discoverySchedule.stop();
       await dispatcher.stop();
       await queue.stop({ timeoutMs: 30_000 });
       await pool.end();

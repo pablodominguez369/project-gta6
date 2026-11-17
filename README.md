@@ -42,7 +42,7 @@ pnpm --filter @gta6/web dev               # http://127.0.0.1:3000
 pnpm --filter @gta6/web test:e2e          # needs the server running, see apps/web/e2e/README.md
 ```
 
-Console pages: `/admin` (summary), `/admin/channels` (list; admins create channels and pause
+Console pages: `/admin` (summary), `/admin/sources` (allowlisted feeds and sources; editors add URLs by hand, admins manage feeds), `/admin/channels` (list; admins create channels and pause
 them), `/admin/publications` (admins and publishers enqueue simulated publications; everyone sees
 their state), `/admin/jobs` (job runs), `/admin/controls` (admin: global pause, spend limits read-only),
 `/admin/audit` (admin: append-only audit log). Every change goes through the user's own session,
