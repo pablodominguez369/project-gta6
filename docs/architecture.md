@@ -129,6 +129,22 @@ draft is attributed to the editor who asked for it, so that editor cannot approv
 provider outages and timeouts leave the request blocked for 15 minutes; a refusal or an invalid
 answer fails it.
 
+### Editorial calendar (T18)
+
+An admin sets weekly windows per channel in `/admin/calendar` (`schedule_rules`, one per channel,
+in the rule's own IANA time zone). `proposeSlots` (`packages/domain/src/calendar.ts`) turns them
+into proposed slots for the next 7 days. Each slot is in the future, and the slots respect the
+channel's posts per local day and minimum gap, counting publications already scheduled or
+published. Nothing is reserved or published.
+
+Daylight saving time is resolved with the IANA database, never with fixed offsets:
+
+- A window keeps its local hour across changes: 10:00 stays 10:00, at 09:00 UTC in winter and
+  08:00 UTC in summer.
+- A local time that does not exist is skipped. For example, 02:00-02:59 on 2026-03-29 in Madrid.
+- A local time that happens twice is proposed once, at its first occurrence. For example,
+  02:00-02:59 on 2026-10-25 in Madrid.
+
 ## Decisions
 
 - [ADR 0001](adr/0001-monolith-nextjs-supabase.md): Next.js + Supabase modular monolith
