@@ -1,0 +1,20 @@
+# Gitleaks configuration. Extends the default ruleset with project-specific rules.
+# Never allowlist a real secret: rotate it instead and purge it from history.
+
+title = "gta6-media-factory"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "supabase-secret-key"
+description = "Supabase secret API key"
+regex = '''\bsb_secret_[A-Za-z0-9_-]{20,}\b'''
+keywords = ["sb_secret_"]
+
+[[rules]]
+id = "supabase-service-role-assignment"
+description = "Supabase service role key assigned in code or env files"
+regex = '''(?i)SUPABASE_SERVICE_ROLE_KEY\s*[:=]\s*["']?(eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})'''
+secretGroup = 1
+keywords = ["supabase_service_role_key"]
