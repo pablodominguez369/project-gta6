@@ -129,6 +129,17 @@ draft is attributed to the editor who asked for it, so that editor cannot approv
 provider outages and timeouts leave the request blocked for 15 minutes; a refusal or an invalid
 answer fails it.
 
+### Script approvals (T19)
+
+An editor or admin who did not write the script reviews it on `/admin/scripts/[id]` and approves
+it, asks for changes or rejects it (the last two need a reason). Each decision is an append-only
+`approvals` row; a database trigger checks that the script is in review and the reviewer is not
+the author, then applies the decision to the script in the same transaction. Before approving,
+the web action runs `runScriptQa` again with the current claims: if a cited claim changed (and so
+lost its verification) after the script was sent to review, the approval is refused and the
+reviewer is asked to request changes. Approval only marks the script as ready; nothing is
+produced or published yet.
+
 ### Editorial calendar (T18)
 
 An admin sets weekly windows per channel in `/admin/calendar` (`schedule_rules`, one per channel,

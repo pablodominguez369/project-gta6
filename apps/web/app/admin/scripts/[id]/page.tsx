@@ -18,9 +18,16 @@ import {
   LOCALE_OPTIONS,
   SCRIPT_STATUS_LABELS,
 } from "@/lib/scripts";
+import { formatDateTime } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-import { saveScript, submitScript } from "../actions";
+import { reviewScript, saveScript, submitScript } from "../actions";
+
+const DECISION_LABELS: Readonly<Record<string, string>> = {
+  approved: "Aprobado",
+  changes_requested: "Cambios pedidos",
+  rejected: "Rechazado",
+};
 
 const TEXTAREA_CLASS =
   "rounded border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100";
@@ -37,13 +44,25 @@ export default async function ScriptPage({ params }: { readonly params: Promise<
   const { data: script } = await supabase
     .from("scripts")
     .select(
-      "id, opportunity_id, version, status, locale, target_duration_s, lines_json, cta, qa_report, opportunities(topic)",
+      "id, opportunity_id, version, status, locale, target_duration_s, lines_json, cta, qa_report, created_by, prompt_version, opportunities(topic)",
     )
     .eq("id", id)
     .maybeSingle();
   if (!script) notFound();
 
-  const claims = await loadScriptClaims(supabase, script.opportunity_id);
+  const [claims, { data: approvals }] = await Promise.all([
+    loadScriptClaims(supabase, script.opportunity_id),
+    supabase
+      .from("approvals")
+      .select("id, decision, reason, created_at, reviewer_id")
+      .eq("target_type", "script")
+      .eq("target_id", script.id)
+      .order("created_at"),
+  ]);
+  const canReview =
+    (user.roles.includes("admin") || user.roles.includes("editor")) &&
+    script.status === "in_review" &&
+    script.created_by !== user.id;
   const parsed = scriptDraftSchema.shape.lines.safeParse(script.lines_json);
   const lines: ScriptLine[] = parsed.success ? parsed.data : [];
   const report = script.qa_report as {
@@ -65,6 +84,11 @@ export default async function ScriptPage({ params }: { readonly params: Promise<
         <h1 className="mt-2 text-xl font-semibold">
           Guion v{script.version} · {SCRIPT_STATUS_LABELS[script.status] ?? script.status}
         </h1>
+        {script.prompt_version ? (
+          <p className="text-sm text-neutral-500">
+            Borrador redactado con IA ({script.prompt_version}).
+          </p>
+        ) : null}
       </div>
 
       <div
@@ -195,6 +219,62 @@ export default async function ScriptPage({ params }: { readonly params: Promise<
           ))}
         </ol>
       )}
+
+      {(approvals ?? []).length > 0 ? (
+        <div>
+          <h2 className="font-medium">Revisiones</h2>
+          <ul className="mt-1 list-disc pl-5 text-sm" data-testid="approvals">
+            {(approvals ?? []).map((approval) => (
+              <li key={approval.id}>
+                {DECISION_LABELS[approval.decision] ?? approval.decision} ·{" "}
+                {formatDateTime(approval.created_at)}
+                {approval.reason ? ` · ${approval.reason}` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {canReview ? (
+        <div
+          className="rounded border border-neutral-200 p-4 dark:border-neutral-800"
+          data-testid="review"
+        >
+          <h2 className="font-medium">Revisar</h2>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+            Comprueba que cada línea dice lo mismo que sus afirmaciones y que los rumores están
+            etiquetados. No puedes revisar tus propios guiones.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-6">
+            <ActionForm action={reviewScript} submitLabel="Aprobar">
+              <input type="hidden" name="scriptId" value={script.id} />
+              <input type="hidden" name="decision" value="approved" />
+            </ActionForm>
+            <ActionForm action={reviewScript} submitLabel="Pedir cambios">
+              <input type="hidden" name="scriptId" value={script.id} />
+              <input type="hidden" name="decision" value="changes_requested" />
+              <TextInput
+                name="reason"
+                aria-label="Motivo de los cambios"
+                placeholder="Motivo"
+                required
+                minLength={3}
+              />
+            </ActionForm>
+            <ActionForm action={reviewScript} submitLabel="Rechazar" tone="danger">
+              <input type="hidden" name="scriptId" value={script.id} />
+              <input type="hidden" name="decision" value="rejected" />
+              <TextInput
+                name="reason"
+                aria-label="Motivo del rechazo"
+                placeholder="Motivo"
+                required
+                minLength={3}
+              />
+            </ActionForm>
+          </div>
+        </div>
+      ) : null}
 
       {editable && report.passed ? (
         <ActionForm action={submitScript} submitLabel="Enviar a revisión">

@@ -216,3 +216,78 @@ export async function requestAiDraft(
   revalidatePath(`/admin/opportunities/${parsed.data.opportunityId}`);
   return actionOk("Borrador pedido. Aparecerá aquí cuando esté listo.");
 }
+
+const reviewSchema = z.object({
+  scriptId: z.uuid(),
+  decision: z.enum(["approved", "changes_requested", "rejected"]),
+  reason: z.string().trim().max(2000),
+});
+
+/**
+ * A second person decides on a script in review. The database refuses the author and any script
+ * not in review; here the QA is also run again, so a script whose claims lost their verification
+ * or evidence after it was submitted cannot be approved.
+ */
+export async function reviewScript(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireRole(["admin", "editor"]);
+  const parsed = reviewSchema.safeParse({
+    scriptId: formData.get("scriptId"),
+    decision: formData.get("decision"),
+    reason: formData.get("reason") ?? "",
+  });
+  if (!parsed.success) return actionError("Decisión no válida.");
+  const { scriptId, decision, reason } = parsed.data;
+  if (decision !== "approved" && reason.length < 3) {
+    return actionError("Explica el motivo (al menos 3 caracteres).");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: script } = await supabase
+    .from("scripts")
+    .select("id, opportunity_id, status, created_by, lines_json, cta, target_duration_s")
+    .eq("id", scriptId)
+    .maybeSingle();
+  if (!script) return actionError("El guion no existe.");
+  if (script.created_by === user.id) return actionError("No puedes revisar un guion tuyo.");
+  if (script.status !== "in_review") return actionError("Este guion no está en revisión.");
+
+  if (decision === "approved") {
+    const draft = scriptDraftSchema.safeParse({ lines: script.lines_json, cta: script.cta ?? "" });
+    const report = draft.success
+      ? runScriptQa(
+          draft.data,
+          await loadScriptClaims(supabase, script.opportunity_id),
+          script.target_duration_s,
+        )
+      : null;
+    if (!report?.passed) {
+      return actionError(
+        "La revisión automática ya no pasa (¿ha cambiado alguna afirmación?). Pide cambios.",
+      );
+    }
+  }
+
+  const { error } = await supabase.from("approvals").insert({
+    target_type: "script",
+    target_id: script.id,
+    reviewer_id: user.id,
+    decision,
+    ...(reason ? { reason } : {}),
+  });
+  if (error) {
+    logger.error({ dbErrorCode: error.code }, "script review failed");
+    return actionError("No se pudo guardar la revisión.");
+  }
+  revalidatePath(`/admin/scripts/${script.id}`);
+  revalidatePath("/admin/scripts");
+  return actionOk(
+    decision === "approved"
+      ? "Guion aprobado."
+      : decision === "rejected"
+        ? "Guion rechazado."
+        : "Cambios pedidos.",
+  );
+}
