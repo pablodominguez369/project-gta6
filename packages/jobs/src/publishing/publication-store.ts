@@ -1,0 +1,195 @@
+import type { ExternalPublication } from "@gta6/connectors";
+import type { ErrorCode, Platform, PublicationStatus } from "@gta6/domain";
+import type pg from "pg";
+
+/** Everything the orchestrator needs for one attempt, read fresh under the channel lock. */
+export interface PublicationContext {
+  readonly publication: {
+    readonly id: string;
+    readonly channelId: string;
+    readonly status: PublicationStatus;
+    readonly idempotencyKey: string;
+    readonly payload: unknown;
+    readonly reconcileRequired: boolean;
+  };
+  readonly channel: {
+    readonly platform: Platform;
+    readonly paused: boolean;
+    readonly timezone: string;
+    readonly maxPostsPerDay: number;
+    readonly minMinutesBetweenPosts: number;
+  };
+  readonly systemPaused: boolean;
+  /** published_at of the channel's successful publications in the last 48 hours. */
+  readonly recentPublishedAt: readonly Date[];
+}
+
+/** Status changes the orchestrator may request. Terminal success goes through markSucceeded. */
+export type PublicationUpdate =
+  | {
+      readonly status: "in_progress";
+      /** Set right before calling the platform; it is never cleared afterwards. */
+      readonly reconcileRequired?: true;
+      readonly errorCode?: ErrorCode;
+    }
+  | { readonly status: "ambiguous" | "failed"; readonly errorCode: ErrorCode }
+  | { readonly status: "blocked"; readonly errorCode: ErrorCode; readonly nextAttemptAt: Date };
+
+export interface WorkerAuditEvent {
+  readonly action: string;
+  readonly publicationId: string;
+  readonly details: Readonly<Record<string, string | number | boolean | null>>;
+}
+
+export type LockResult<T> =
+  { readonly acquired: true; readonly value: T } | { readonly acquired: false };
+
+/** Persistence used by the publication orchestrator. Postgres today; swappable for tests. */
+export interface PublicationStore {
+  findChannelId(publicationId: string): Promise<string | null>;
+  /**
+   * Runs `fn` while holding an exclusive lock on the channel, so two attempts for the same
+   * channel never interleave (frequency limits and reconciliation stay consistent).
+   */
+  withChannelLock<T>(channelId: string, fn: () => Promise<T>): Promise<LockResult<T>>;
+  loadContext(publicationId: string): Promise<PublicationContext | null>;
+  update(publicationId: string, update: PublicationUpdate): Promise<void>;
+  markSucceeded(
+    publicationId: string,
+    external: ExternalPublication,
+    publishedAt: Date,
+  ): Promise<void>;
+  recordAudit(event: WorkerAuditEvent): Promise<void>;
+}
+
+interface ContextRow {
+  id: string;
+  channel_id: string;
+  status: PublicationStatus;
+  idempotency_key: string;
+  payload_json: unknown;
+  reconcile_required: boolean;
+  platform: Platform;
+  paused: boolean;
+  timezone: string;
+  max_posts_per_day: number;
+  min_minutes_between_posts: number;
+  global_paused: boolean;
+  recent_published_at: Date[] | null;
+}
+
+/** Updates never touch a terminal row, whatever the caller asks for. */
+const NOT_TERMINAL = "status not in ('succeeded', 'failed')";
+
+/**
+ * Postgres implementation. Uses a direct connection (the worker's DATABASE_URL), which bypasses
+ * RLS like the secret key: it only runs in the worker, never in the web app.
+ */
+export class PgPublicationStore implements PublicationStore {
+  constructor(private readonly pool: pg.Pool) {}
+
+  async findChannelId(publicationId: string): Promise<string | null> {
+    const { rows } = await this.pool.query<{ channel_id: string }>(
+      "select channel_id from public.publications where id = $1",
+      [publicationId],
+    );
+    return rows[0]?.channel_id ?? null;
+  }
+
+  async withChannelLock<T>(channelId: string, fn: () => Promise<T>): Promise<LockResult<T>> {
+    // Session-level advisory lock on a dedicated connection: released explicitly, or by Postgres
+    // when the connection drops (worker crash), so a lock is never left behind.
+    const client = await this.pool.connect();
+    const lockSql = "hashtextextended('publication-channel:' || $1, 0)";
+    try {
+      const { rows } = await client.query<{ locked: boolean }>(
+        `select pg_try_advisory_lock(${lockSql}) as locked`,
+        [channelId],
+      );
+      if (!rows[0]?.locked) return { acquired: false };
+      try {
+        return { acquired: true, value: await fn() };
+      } finally {
+        await client.query(`select pg_advisory_unlock(${lockSql})`, [channelId]);
+      }
+    } finally {
+      client.release();
+    }
+  }
+
+  async loadContext(publicationId: string): Promise<PublicationContext | null> {
+    const { rows } = await this.pool.query<ContextRow>(
+      `select p.id, p.channel_id, p.status, p.idempotency_key, p.payload_json, p.reconcile_required,
+              c.platform, c.paused, c.timezone, c.max_posts_per_day, c.min_minutes_between_posts,
+              s.global_paused,
+              (select array_agg(r.published_at order by r.published_at)
+                 from public.publications r
+                where r.channel_id = p.channel_id
+                  and r.status = 'succeeded'
+                  and r.published_at > now() - interval '48 hours') as recent_published_at
+         from public.publications p
+         join public.channels c on c.id = p.channel_id
+        cross join public.system_controls s
+        where p.id = $1`,
+      [publicationId],
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      publication: {
+        id: row.id,
+        channelId: row.channel_id,
+        status: row.status,
+        idempotencyKey: row.idempotency_key,
+        payload: row.payload_json,
+        reconcileRequired: row.reconcile_required,
+      },
+      channel: {
+        platform: row.platform,
+        paused: row.paused,
+        timezone: row.timezone,
+        maxPostsPerDay: row.max_posts_per_day,
+        minMinutesBetweenPosts: row.min_minutes_between_posts,
+      },
+      systemPaused: row.global_paused,
+      recentPublishedAt: row.recent_published_at ?? [],
+    };
+  }
+
+  async update(publicationId: string, update: PublicationUpdate): Promise<void> {
+    const errorCode = "errorCode" in update ? (update.errorCode ?? null) : null;
+    const nextAttemptAt = "nextAttemptAt" in update ? update.nextAttemptAt : null;
+    const reconcileRequired = "reconcileRequired" in update;
+    await this.pool.query(
+      `update public.publications
+          set status = $2::public.publication_status,
+              error_code = $3,
+              next_attempt_at = $4,
+              reconcile_required = reconcile_required or $5
+        where id = $1 and ${NOT_TERMINAL}`,
+      [publicationId, update.status, errorCode, nextAttemptAt, reconcileRequired],
+    );
+  }
+
+  async markSucceeded(
+    publicationId: string,
+    external: ExternalPublication,
+    publishedAt: Date,
+  ): Promise<void> {
+    await this.pool.query(
+      `update public.publications
+          set status = 'succeeded', external_id = $2, permalink = $3, published_at = $4,
+              error_code = null, next_attempt_at = null
+        where id = $1 and ${NOT_TERMINAL}`,
+      [publicationId, external.externalId, external.permalink, publishedAt],
+    );
+  }
+
+  async recordAudit(event: WorkerAuditEvent): Promise<void> {
+    await this.pool.query(
+      `insert into public.audit_events (actor_type, action, object_type, object_id, safe_details)
+       values ('worker', $1, 'publications', $2, $3)`,
+      [event.action, event.publicationId, JSON.stringify(event.details)],
+    );
+  }
+}

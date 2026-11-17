@@ -10,6 +10,7 @@ import { signOut } from "./actions";
 const NAV: readonly { href: string; label: string; roles: readonly AppRole[] | "member" }[] = [
   { href: "/admin", label: "Resumen", roles: "member" },
   { href: "/admin/channels", label: "Canales", roles: "member" },
+  { href: "/admin/publications", label: "Publicaciones", roles: "member" },
   { href: "/admin/jobs", label: "Jobs", roles: "member" },
   { href: "/admin/controls", label: "Controles", roles: ["admin"] },
   { href: "/admin/audit", label: "Auditoría", roles: ["admin"] },

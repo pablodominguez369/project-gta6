@@ -203,9 +203,11 @@ export type Database = {
           external_id: string | null;
           id: string;
           idempotency_key: string;
+          next_attempt_at: string | null;
           payload_json: NonNullable<Json>;
           permalink: string | null;
           published_at: string | null;
+          reconcile_required: boolean;
           scheduled_at: string | null;
           status: Database["public"]["Enums"]["publication_status"];
           updated_at: string;
@@ -219,9 +221,11 @@ export type Database = {
           external_id?: string | null;
           id?: string;
           idempotency_key: string;
+          next_attempt_at?: string | null;
           payload_json?: NonNullable<Json>;
           permalink?: string | null;
           published_at?: string | null;
+          reconcile_required?: boolean;
           scheduled_at?: string | null;
           status?: Database["public"]["Enums"]["publication_status"];
           updated_at?: string;
@@ -234,9 +238,11 @@ export type Database = {
           external_id?: string | null;
           id?: string;
           idempotency_key?: string;
+          next_attempt_at?: string | null;
           payload_json?: NonNullable<Json>;
           permalink?: string | null;
           published_at?: string | null;
+          reconcile_required?: boolean;
           scheduled_at?: string | null;
           status?: Database["public"]["Enums"]["publication_status"];
           updated_at?: string;
@@ -250,6 +256,34 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      simulated_platform_posts: {
+        Row: {
+          created_at: string;
+          external_id: string;
+          id: string;
+          idempotency_key: string;
+          permalink: string | null;
+          status: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          external_id: string;
+          id?: string;
+          idempotency_key: string;
+          permalink?: string | null;
+          status: string;
+        };
+        Update: {
+          created_at?: string;
+          external_id?: string;
+          id?: string;
+          idempotency_key?: string;
+          permalink?: string | null;
+          status?: string;
+        };
+        Relationships: [];
       };
       system_controls: {
         Row: {

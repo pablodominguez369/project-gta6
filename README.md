@@ -43,7 +43,8 @@ pnpm --filter @gta6/web test:e2e          # needs the server running, see apps/w
 ```
 
 Console pages: `/admin` (summary), `/admin/channels` (list; admins create channels and pause
-them), `/admin/jobs` (job runs), `/admin/controls` (admin: global pause, spend limits read-only),
+them), `/admin/publications` (admins and publishers enqueue simulated publications; everyone sees
+their state), `/admin/jobs` (job runs), `/admin/controls` (admin: global pause, spend limits read-only),
 `/admin/audit` (admin: append-only audit log). Every change goes through the user's own session,
 so RLS applies and the audit trigger records who did it.
 
@@ -54,7 +55,9 @@ Auth: `proxy.ts` refreshes the Supabase session on every request and sends anony
 ## Worker (apps/worker)
 
 Long-running Node process (never on Vercel) that consumes pg-boss queues from the same Postgres.
-It refuses to start unless `PUBLISHING_MODE=simulated`.
+It refuses to start unless `PUBLISHING_MODE=simulated`. It also runs the publication dispatcher
+(every 5 s) and the idempotent simulated publisher; see the flow in
+[docs/architecture.md](docs/architecture.md#publication-flow-t10).
 
 ```bash
 cp .env.example apps/worker/.env.local   # fill SUPABASE_URL, SUPABASE_SECRET_KEY, DATABASE_URL
@@ -90,6 +93,12 @@ gitleaks git --config .gitleaks.toml --redact --verbose .
 ```
 
 If a real secret is ever committed: rotate it first, then purge it from history. Never allowlist it.
+
+## Runbooks
+
+- [Create the first admin](docs/runbooks/first-admin.md)
+- [Global and channel pause](docs/runbooks/global-pause.md)
+- [Ambiguous publication (manual reconciliation)](docs/runbooks/ambiguous-publication.md)
 
 ## Workspace layout
 

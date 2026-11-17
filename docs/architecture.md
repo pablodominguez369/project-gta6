@@ -14,17 +14,15 @@ Supabase Auth / Storage                     Connectors (simulated in Phase 1)
 
 ## Packages and dependency rule
 
-| Package                   | Responsibility                                     | May depend on       |
-| ------------------------- | -------------------------------------------------- | ------------------- |
-| `packages/domain`         | Entities, Zod schemas, errors, pure policies       | nothing internal    |
-| `packages/config`         | Typed environment loading                          | `domain`            |
-| `packages/observability`  | Logger with redaction                              | `domain`            |
-| `packages/db`             | Supabase clients, generated types, repositories    | `domain`, `config`  |
-| `packages/jobs`           | `JobQueue` interface, pg-boss implementation, jobs | `domain`, `db`, ... |
-| `packages/connectors`     | Provider interfaces and simulators                 | `domain`            |
-| `apps/web`, `apps/worker` | Composition only, no business rules                | any package         |
-
-Packages are added by their Phase 1 tasks; `db` and `jobs` arrive with T7/T8.
+| Package                   | Responsibility                                  | May depend on                                 |
+| ------------------------- | ----------------------------------------------- | --------------------------------------------- |
+| `packages/domain`         | Entities, Zod schemas, errors, pure policies    | nothing internal                              |
+| `packages/config`         | Typed environment loading                       | `domain`                                      |
+| `packages/observability`  | Logger with redaction                           | `domain`                                      |
+| `packages/db`             | Supabase clients, generated types, repositories | `domain`, `config`                            |
+| `packages/jobs`           | `JobQueue`, pg-boss, publication orchestrator   | `domain`, `db`, `connectors`, `observability` |
+| `packages/connectors`     | Provider interfaces and simulators              | `domain`                                      |
+| `apps/web`, `apps/worker` | Composition only, no business rules             | any package                                   |
 
 ## Authentication
 
@@ -40,6 +38,31 @@ Packages are added by their Phase 1 tasks; `db` and `jobs` arrive with T7/T8.
 An admin creates a channel in Draft mode and enqueues a simulated publication. The worker processes
 it with `SimulatedPublisher`, honours global and per-channel pause, de-duplicates by idempotency key,
 reconciles ambiguous results before any retry, and writes every step to the audit log.
+
+### Publication flow (T10)
+
+```text
+/admin/publications (admin, publisher)
+   | insert publications(status=queued, idempotency_key from the form)   <- RLS, unique key
+   v
+dispatcher (worker, every 5 s)  -- outbox: queued | blocked past next_attempt_at | orphaned in_progress
+   | enqueue publish.simulated, singletonKey = publication id (exclusive queue)
+   v
+processPublication (under a per-channel advisory lock)
+   1. gates: global pause, channel pause, platform must be "simulated"   -> blocked / failed
+   2. reconcile_required? ask the platform first; found -> succeeded (no new post)
+   3. frequency limits in the channel time zone                          -> blocked
+   4. commit reconcile_required = true, then publish
+      ok -> succeeded | timeout -> ambiguous + retry (reconciles) | 429/503 -> retry
+      expired credential / invalid / forbidden -> failed (no retry)
+   5. no attempts left and still ambiguous -> stays ambiguous + audit
+      publications.reconciliation_required (runbooks/ambiguous-publication.md)
+```
+
+Code: `packages/jobs/src/publishing/`. The worker writes publication state over a direct Postgres
+connection (`DATABASE_URL`) so the status change and the advisory lock share the same database;
+like the secret key it bypasses RLS and only exists in the worker. Ambiguous rows are never picked
+up automatically after the last attempt: an operator decides (rule 7).
 
 ## Decisions
 

@@ -45,7 +45,8 @@ export default async function JobsPage() {
         </div>
       ) : (
         <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          Todavía no hay ejecuciones. El worker llega en la siguiente tarea.
+          Todavía no hay ejecuciones. Arranca el worker con{" "}
+          <code>pnpm --filter @gta6/worker dev</code>.
         </p>
       )}
     </section>
