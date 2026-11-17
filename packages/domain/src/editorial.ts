@@ -32,6 +32,15 @@ export const SCRIPT_STATUSES = [
 ] as const;
 export type ScriptStatus = (typeof SCRIPT_STATUSES)[number];
 
+export const SCRIPT_REQUEST_STATUSES = [
+  "queued",
+  "running",
+  "succeeded",
+  "blocked",
+  "failed",
+] as const;
+export type ScriptRequestStatus = (typeof SCRIPT_REQUEST_STATUSES)[number];
+
 export const SCRIPT_LOCALES = ["es-ES", "es-419"] as const;
 export type ScriptLocale = (typeof SCRIPT_LOCALES)[number];
 

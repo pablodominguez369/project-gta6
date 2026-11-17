@@ -178,3 +178,41 @@ export async function submitScript(
   revalidatePath(`/admin/scripts/${script.id}`);
   return actionOk("Enviado a revisión. Lo aprueba otra persona.");
 }
+
+const draftRequestSchema = z.object({
+  opportunityId: z.uuid(),
+  locale: z.enum(SCRIPT_LOCALES),
+  targetDurationS: z.coerce.number().int().min(20).max(60),
+});
+
+/**
+ * Asks the worker to draft a script with the LLM. Only a queued row is written here; the worker
+ * calls the LLM through the spend gate, so nothing is spent while the limits are 0.
+ */
+export async function requestAiDraft(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireRole(["admin", "editor"]);
+  const parsed = draftRequestSchema.safeParse({
+    opportunityId: formData.get("opportunityId"),
+    locale: formData.get("locale"),
+    targetDurationS: formData.get("targetDurationS"),
+  });
+  if (!parsed.success) return actionError("Revisa el idioma y la duración (20 a 60 s).");
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("script_requests").insert({
+    opportunity_id: parsed.data.opportunityId,
+    locale: parsed.data.locale,
+    target_duration_s: parsed.data.targetDurationS,
+    requested_by: user.id,
+  });
+  if (error?.code === "23505") return actionOk("Ya hay un borrador con IA en marcha.");
+  if (error) {
+    logger.error({ dbErrorCode: error.code }, "script request failed");
+    return actionError("No se pudo pedir el borrador (¿la oportunidad está aceptada?).");
+  }
+  revalidatePath(`/admin/opportunities/${parsed.data.opportunityId}`);
+  return actionOk("Borrador pedido. Aparecerá aquí cuando esté listo.");
+}

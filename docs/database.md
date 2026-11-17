@@ -34,6 +34,8 @@ Rules enforced in SQL:
   `create_claim(...)` (security invoker, RLS applies) writes a claim and its sources in one
   transaction.
 - Changing a claim's text, certainty, sensitivity or sources clears its verification.
+- `script_requests`: editors only insert `queued` rows for accepted opportunities (one open request
+  per opportunity); every later change is made by the worker.
 - A script reaches `approved`, `rejected` or `changes_requested` only through an `approvals` row
   by someone other than its author, and only while it is `in_review`. Approvals are append-only.
 - `created_by` on claims and scripts cannot be changed after insert.

@@ -1,16 +1,26 @@
-import { SimulatedPublisher } from "@gta6/connectors";
+import {
+  createLlmProvider,
+  DisabledLlmProvider,
+  EnvSecretStore,
+  SimulatedPublisher,
+  type LlmProvider,
+} from "@gta6/connectors";
 import { createAdminClient } from "@gta6/db";
 import {
   createDiscoveryPollHandler,
   createOpportunityBuildHandler,
   createPublishHandler,
+  createScriptDraftHandler,
   PgBossQueue,
+  PgLlmUsageStore,
   PgPublicationStore,
   PgSimulatedRemoteStore,
   publishSimulatedPayloadSchema,
   QUEUES,
   scheduleDiscoveryPoll,
+  scriptDraftPayloadSchema,
   startDispatcher,
+  startScriptDispatcher,
   trackJobRuns,
   type JobQueue,
 } from "@gta6/jobs";
@@ -83,6 +93,22 @@ export async function startWorker(source: NodeJS.ProcessEnv = process.env): Prom
   );
   const discoverySchedule = scheduleDiscoveryPoll(queue);
 
+  // LLM drafting: off unless configured, and every call goes through the spend gate.
+  const provider = await buildLlmProvider(env, logger);
+  await queue.work(
+    QUEUES.scriptDraft.name,
+    trackJobRuns(
+      db,
+      logger,
+      createScriptDraftHandler({ pool, provider, store: new PgLlmUsageStore(pool) }),
+      {
+        targetType: "script_requests",
+        targetId: (data) => scriptDraftPayloadSchema.safeParse(data).data?.requestId,
+      },
+    ),
+  );
+  const scriptDispatcher = startScriptDispatcher(pool, queue, logger);
+
   logger.info({ queues: Object.values(QUEUES).map((q) => q.name) }, "worker started");
 
   return {
@@ -92,9 +118,27 @@ export async function startWorker(source: NodeJS.ProcessEnv = process.env): Prom
       logger.info("worker stopping");
       discoverySchedule.stop();
       await dispatcher.stop();
+      await scriptDispatcher.stop();
       await queue.stop({ timeoutMs: 30_000 });
       await pool.end();
       logger.info("worker stopped");
     },
   };
+}
+
+/** Falls back to the disabled provider on any configuration problem (safe block). */
+async function buildLlmProvider(
+  env: ReturnType<typeof loadWorkerEnv>,
+  logger: Logger,
+): Promise<LlmProvider> {
+  const result = await createLlmProvider(
+    { provider: env.LLM_PROVIDER, model: env.LLM_MODEL, apiKeyRef: env.LLM_API_KEY_REF },
+    new EnvSecretStore(env.APP_ENV),
+  );
+  if (!result.ok) {
+    logger.error({ errorCode: result.error.code }, "LLM provider unavailable; drafting disabled");
+    return new DisabledLlmProvider();
+  }
+  logger.info({ llmProvider: result.value.name }, "LLM provider ready");
+  return result.value;
 }
