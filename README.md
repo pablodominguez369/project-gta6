@@ -102,6 +102,7 @@ packages/
   config/        # typed environment loading
   db/            # generated Supabase types and admin client
   jobs/          # JobQueue interface, pg-boss implementation, queue definitions
+  connectors/    # publisher/LLM/TTS/discovery interfaces, simulated publisher, secret store
   observability/ # logger with secret redaction
 supabase/        # SQL migrations, pgTAP tests, local seed
 docs/            # spec, architecture, database, ADRs, runbooks
