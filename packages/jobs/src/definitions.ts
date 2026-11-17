@@ -24,6 +24,13 @@ export const QUEUES = {
     retryDelaySeconds: 60,
     expireInSeconds: 600,
   },
+  opportunityBuild: {
+    name: "opportunity.build",
+    policy: "exclusive",
+    retryLimit: 2,
+    retryDelaySeconds: 30,
+    expireInSeconds: 300,
+  },
   systemPing: {
     name: "system.ping",
     policy: "standard",
