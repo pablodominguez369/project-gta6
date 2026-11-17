@@ -2,6 +2,7 @@ import { SimulatedPublisher } from "@gta6/connectors";
 import { createAdminClient } from "@gta6/db";
 import {
   createDiscoveryPollHandler,
+  createOpportunityBuildHandler,
   createPublishHandler,
   PgBossQueue,
   PgPublicationStore,
@@ -74,7 +75,11 @@ export async function startWorker(source: NodeJS.ProcessEnv = process.env): Prom
   // Phase 2: allowlisted feeds only (admins enable a feed after reviewing its terms).
   await queue.work(
     QUEUES.discoveryPoll.name,
-    trackJobRuns(db, logger, createDiscoveryPollHandler(pool)),
+    trackJobRuns(db, logger, createDiscoveryPollHandler(pool, queue)),
+  );
+  await queue.work(
+    QUEUES.opportunityBuild.name,
+    trackJobRuns(db, logger, createOpportunityBuildHandler(pool)),
   );
   const discoverySchedule = scheduleDiscoveryPoll(queue);
 

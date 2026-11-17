@@ -64,6 +64,20 @@ connection (`DATABASE_URL`) so the status change and the advisory lock share the
 like the secret key it bypasses RLS and only exists in the worker. Ambiguous rows are never picked
 up automatically after the last attempt: an operator decides (rule 7).
 
+## Editorial research (Phase 2)
+
+```text
+allowlisted feeds / manual URL -> sources (metadata + 300-char excerpt)
+  -> opportunity.build: same story within 72 h (title trigram similarity >= 0.5) -> opportunity
+  -> assessment: confirmed (official source) | reported (2+ independent reliable) | rumor
+     + risk flags (leak -> auto-discarded, spoiler, single_source, unknown_provenance)
+     + score 0-100 (freshness, coverage, trust; rumors penalised) + expiry 72 h after latest source
+  -> editor shortlists / accepts / discards with a reason
+```
+
+Code: `packages/domain/src/opportunity.ts` (pure rules) and `packages/jobs/src/opportunities/`.
+The score orders what to look at first; only the certainty says what a script may state.
+
 ## Decisions
 
 - [ADR 0001](adr/0001-monolith-nextjs-supabase.md): Next.js + Supabase modular monolith
