@@ -45,3 +45,6 @@ reconciles ambiguous results before any retry, and writes every step to the audi
 
 - [ADR 0001](adr/0001-monolith-nextjs-supabase.md): Next.js + Supabase modular monolith
 - [ADR 0002](adr/0002-pg-boss-job-queue.md): pg-boss as the initial job queue
+- [ADR 0003](adr/0003-secret-references.md): secrets are referenced, never stored
+
+Connectors and the publisher contract: [connectors.md](connectors.md).
