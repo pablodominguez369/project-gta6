@@ -3,16 +3,25 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { requireRole } from "@/lib/auth/require-role";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 import { signOut } from "./actions";
 
 const NAV: readonly { href: string; label: string; roles: readonly AppRole[] | "member" }[] = [
   { href: "/admin", label: "Resumen", roles: "member" },
+  { href: "/admin/channels", label: "Canales", roles: "member" },
+  { href: "/admin/jobs", label: "Jobs", roles: "member" },
   { href: "/admin/controls", label: "Controles", roles: ["admin"] },
+  { href: "/admin/audit", label: "Auditoría", roles: ["admin"] },
 ];
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const user = await requireRole("member");
+  const supabase = await createSupabaseServerClient();
+  const { data: controls } = await supabase
+    .from("system_controls")
+    .select("global_paused")
+    .maybeSingle();
   const visibleNav = NAV.filter(
     (item) => item.roles === "member" || item.roles.some((role) => user.roles.includes(role)),
   );
@@ -41,6 +50,11 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           </div>
         </div>
       </header>
+      {controls?.global_paused ? (
+        <div role="alert" className="bg-red-600 px-4 py-2 text-center text-sm text-white">
+          Sistema en pausa global: no se ejecuta ninguna publicación.
+        </div>
+      ) : null}
       <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
     </div>
   );

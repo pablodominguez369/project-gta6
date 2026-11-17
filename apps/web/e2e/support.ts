@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 import type { AppRole } from "@gta6/domain";
 import { createClient } from "@supabase/supabase-js";
+import type { Page } from "playwright";
 
 /** Loads apps/web/.env.local without printing anything. Shell variables take precedence. */
 function loadLocalEnv(): void {
@@ -62,6 +63,38 @@ export async function createTestUser(roles: readonly AppRole[]): Promise<TestUse
   return { id, email, password };
 }
 
+/**
+ * The database refuses to remove the last admin, so the suite keeps one permanent local admin
+ * that is never deleted. Its password is not stored anywhere.
+ */
+export async function ensureSentinelAdmin(): Promise<void> {
+  const email = "e2e-sentinel-admin@example.test";
+  const { data } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+  let id = data.users.find((user) => user.email === email)?.id;
+  if (!id) {
+    const created = await adminClient.auth.admin.createUser({
+      email,
+      password: randomBytes(24).toString("base64url"),
+      email_confirm: true,
+    });
+    if (created.error)
+      throw new Error(`sentinel create failed: ${created.error.code ?? "unknown"}`);
+    id = created.data.user.id;
+  }
+  await adminClient.from("user_roles").upsert({ user_id: id, role: "admin" });
+}
+
 export async function deleteTestUser(user: TestUser): Promise<void> {
-  await adminClient.auth.admin.deleteUser(user.id);
+  const { error } = await adminClient.auth.admin.deleteUser(user.id);
+  if (error) throw new Error(`deleteUser failed: ${error.code ?? "unknown"}`);
+}
+
+export async function signIn(
+  page: Page,
+  user: Pick<TestUser, "email" | "password">,
+): Promise<void> {
+  await page.goto(`${baseUrl}/login`);
+  await page.getByLabel("Email").fill(user.email);
+  await page.getByLabel("Contraseña").fill(user.password);
+  await page.getByRole("button", { name: "Entrar" }).click();
 }

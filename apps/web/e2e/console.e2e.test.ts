@@ -1,0 +1,119 @@
+import { chromium, type Browser, type Page } from "playwright";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import {
+  adminClient,
+  baseUrl,
+  createTestUser,
+  deleteTestUser,
+  ensureSentinelAdmin,
+  signIn,
+  type TestUser,
+} from "./support";
+
+let browser: Browser;
+let admin: TestUser;
+let reader: TestUser;
+
+async function adminPage(): Promise<Page> {
+  const page = await browser.newPage();
+  await signIn(page, admin);
+  await page.waitForURL(`${baseUrl}/admin`);
+  return page;
+}
+
+beforeAll(async () => {
+  await ensureSentinelAdmin();
+  [admin, reader] = await Promise.all([createTestUser(["admin"]), createTestUser(["read_only"])]);
+  browser = await chromium.launch();
+});
+
+afterAll(async () => {
+  // Leave the system running for other suites, whatever happened in the tests.
+  await adminClient
+    .from("system_controls")
+    .update({ global_paused: false, paused_reason: null })
+    .eq("id", true);
+  await browser.close();
+  await Promise.all([admin, reader].filter(Boolean).map(deleteTestUser));
+});
+
+describe("admin console", () => {
+  it("global pause is persisted, visible after reload and audited with the admin as actor", async () => {
+    const startedAt = new Date().toISOString();
+    const page = await adminPage();
+    await page.goto(`${baseUrl}/admin/controls`);
+
+    const reason = `e2e pause ${String(Date.now())}`;
+    await page.getByTestId("pause-form").getByLabel("Motivo").fill(reason);
+    await page.getByRole("button", { name: "Pausa global" }).click();
+    await page.getByText("Sistema en pausa.").waitFor();
+
+    await page.reload();
+    expect(await page.getByTestId("global-pause-state").textContent()).toBe(`En pausa: ${reason}`);
+    await page.getByText("Sistema en pausa global: no se ejecuta ninguna publicación.").waitFor();
+
+    const { data: events } = await adminClient
+      .from("audit_events")
+      .select("action, actor_id, actor_type, safe_details")
+      .eq("action", "system_controls.update")
+      .gte("created_at", startedAt);
+    expect(events).toHaveLength(1);
+    expect(events?.[0]).toMatchObject({ actor_id: admin.id, actor_type: "user" });
+
+    await page.getByRole("button", { name: "Reanudar sistema" }).click();
+    await page.getByText("Sistema reanudado.").waitFor();
+    await page.close();
+  });
+
+  it("creates a channel in draft mode and pauses it", async () => {
+    const page = await adminPage();
+    await page.goto(`${baseUrl}/admin/channels`);
+
+    const name = `Canal e2e ${String(Date.now())}`;
+    await page.getByLabel("Nombre").fill(name);
+    await page.getByRole("button", { name: "Crear canal" }).click();
+    await page.getByText("Canal creado en modo draft.").waitFor();
+
+    const row = page.getByRole("row").filter({ hasText: name });
+    await row.getByLabel("Motivo de la pausa").fill("Prueba e2e");
+    await row.getByRole("button", { name: "Pausar" }).click();
+    await page.getByText("Canal en pausa.").waitFor();
+
+    await page.reload();
+    expect(await page.getByRole("row").filter({ hasText: name }).textContent()).toContain(
+      "En pausa (Prueba e2e)",
+    );
+
+    const { data: channel } = await adminClient
+      .from("channels")
+      .select("id, mode")
+      .eq("display_name", name)
+      .single();
+    expect(channel?.mode).toBe("draft");
+    if (channel) await adminClient.from("channels").delete().eq("id", channel.id);
+    await page.close();
+  });
+
+  it("read_only sees channels without admin actions and cannot open controls or audit", async () => {
+    const page = await browser.newPage();
+    await signIn(page, reader);
+    await page.waitForURL(`${baseUrl}/admin`);
+
+    await page.goto(`${baseUrl}/admin/channels`);
+    expect(await page.getByRole("button", { name: "Crear canal" }).count()).toBe(0);
+    expect(await page.getByRole("button", { name: "Pausar" }).count()).toBe(0);
+
+    expect((await page.goto(`${baseUrl}/admin/controls`))?.status()).toBe(403);
+    expect((await page.goto(`${baseUrl}/admin/audit`))?.status()).toBe(403);
+    await page.close();
+  });
+
+  it("shows the audit log to admins", async () => {
+    const page = await adminPage();
+    await page.goto(`${baseUrl}/admin/audit`);
+
+    expect(await page.getByTestId("audit-table").textContent()).toContain("system_controls.update");
+    await page.close();
+  });
+});
