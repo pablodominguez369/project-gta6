@@ -42,6 +42,11 @@ pnpm --filter @gta6/web dev               # http://127.0.0.1:3000
 pnpm --filter @gta6/web test:e2e          # needs the server running, see apps/web/e2e/README.md
 ```
 
+Console pages: `/admin` (summary), `/admin/channels` (list; admins create channels and pause
+them), `/admin/jobs` (job runs), `/admin/controls` (admin: global pause, spend limits read-only),
+`/admin/audit` (admin: append-only audit log). Every change goes through the user's own session,
+so RLS applies and the audit trigger records who did it.
+
 Auth: `proxy.ts` refreshes the Supabase session on every request and sends anonymous users to
 `/login`. Pages and server actions call `requireRole(...)`, which answers 403 via `forbidden()`
 (experimental `authInterrupts` flag in Next 16) when the role is missing.
@@ -82,6 +87,7 @@ apps/
 packages/
   domain/        # entities, errors, Result type, pure policies
   config/        # typed environment loading
+  db/            # generated Supabase types and admin client
   observability/ # logger with secret redaction
 supabase/        # SQL migrations, pgTAP tests, local seed
 docs/            # spec, architecture, database, ADRs, runbooks

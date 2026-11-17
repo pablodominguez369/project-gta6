@@ -7,7 +7,7 @@ export default async function AdminHomePage() {
   const { data: controls } = await supabase
     .from("system_controls")
     .select("global_paused, paused_reason")
-    .maybeSingle<{ global_paused: boolean; paused_reason: string | null }>();
+    .maybeSingle();
 
   return (
     <section className="flex flex-col gap-4">

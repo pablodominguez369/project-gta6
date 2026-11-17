@@ -5,3 +5,4 @@ dist
 coverage
 pnpm-lock.yaml
 docs/GTA-6-Media-Factory-Especificacion-Tecnica.md
+packages/db/src/database.types.ts

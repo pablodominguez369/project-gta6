@@ -1,21 +1,22 @@
-import { chromium, type Browser, type Page } from "playwright";
+import { chromium, type Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { baseUrl, createTestUser, deleteTestUser, type TestUser } from "./support";
+import {
+  baseUrl,
+  createTestUser,
+  deleteTestUser,
+  ensureSentinelAdmin,
+  signIn,
+  type TestUser,
+} from "./support";
 
 let browser: Browser;
 let admin: TestUser;
 let editor: TestUser;
 let noRole: TestUser;
 
-async function signIn(page: Page, user: Pick<TestUser, "email" | "password">): Promise<void> {
-  await page.goto(`${baseUrl}/login`);
-  await page.getByLabel("Email").fill(user.email);
-  await page.getByLabel("Contraseña").fill(user.password);
-  await page.getByRole("button", { name: "Entrar" }).click();
-}
-
 beforeAll(async () => {
+  await ensureSentinelAdmin();
   [admin, editor, noRole] = await Promise.all([
     createTestUser(["admin"]),
     createTestUser(["editor"]),

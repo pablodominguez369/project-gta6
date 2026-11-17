@@ -51,6 +51,10 @@ jobs:
       # Applies every migration from scratch, then runs the pgTAP suite in supabase/tests.
       - run: pnpm db:start
       - run: pnpm db:test
+      - name: Generated types match the migrations
+        run: |
+          pnpm db:types
+          git diff --exit-code packages/db/src/database.types.ts
 
   e2e:
     name: End-to-end (auth and role guards)

@@ -22,6 +22,7 @@ Rules enforced in SQL:
 - `credential_refs.secret_ref` must be a reference URI (`scheme://path`), not a token.
 - `publications.idempotency_key` is unique; a `succeeded` publication must have an `external_id`.
 - Spend limits default to `0` and only an admin can change them.
+- The last admin cannot be removed (role delete or user delete is rejected).
 - `audit_events` rejects UPDATE, DELETE and TRUNCATE for every role, including `service_role`.
 - Changes to `user_roles`, `system_controls`, `channels`, `credential_refs` and `publications` are
   audited automatically by trigger (changed columns and their new values; `secret_ref` excluded).
@@ -32,6 +33,7 @@ Rules enforced in SQL:
 pnpm db:start      # start only the local Postgres (Docker)
 pnpm db:reset      # re-apply all migrations and supabase/seed.sql
 pnpm db:test       # pgTAP tests in supabase/tests
+pnpm db:types      # regenerate packages/db/src/database.types.ts (CI fails if it is stale)
 pnpm supabase migration new <name>
 pnpm supabase start   # full local stack (Auth, Storage, Studio) - needed from T6
 ```
