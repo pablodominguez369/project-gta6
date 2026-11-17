@@ -9,7 +9,7 @@ const FAKE_DB_PASSWORD = "fake-db-password-for-tests";
 const validWorkerEnv = {
   APP_ENV: "local",
   LOG_LEVEL: "debug",
-  NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+  SUPABASE_URL: "http://127.0.0.1:54321",
   SUPABASE_SECRET_KEY: FAKE_SERVICE_KEY,
   DATABASE_URL: `postgresql://postgres:${FAKE_DB_PASSWORD}@127.0.0.1:54322/postgres`,
   PUBLISHING_MODE: "simulated",

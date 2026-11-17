@@ -51,6 +51,19 @@ Auth: `proxy.ts` refreshes the Supabase session on every request and sends anony
 `/login`. Pages and server actions call `requireRole(...)`, which answers 403 via `forbidden()`
 (experimental `authInterrupts` flag in Next 16) when the role is missing.
 
+## Worker (apps/worker)
+
+Long-running Node process (never on Vercel) that consumes pg-boss queues from the same Postgres.
+It refuses to start unless `PUBLISHING_MODE=simulated`.
+
+```bash
+cp .env.example apps/worker/.env.local   # fill SUPABASE_URL, SUPABASE_SECRET_KEY, DATABASE_URL
+pnpm --filter @gta6/worker dev           # watch mode
+pnpm --filter @gta6/worker enqueue:ping  # diagnostic job; shows up in /admin/jobs
+pnpm --filter @gta6/jobs test:integration
+docker build -f apps/worker/Dockerfile -t gta6-worker .
+```
+
 ## Database
 
 See [docs/database.md](docs/database.md). Quick start:
@@ -83,11 +96,12 @@ If a real secret is ever committed: rotate it first, then purge it from history.
 ```text
 apps/
   web/           # Next.js admin console (auth, role guards)
-  worker/        # Node job worker - added in T8
+  worker/        # Node job worker (pg-boss)
 packages/
   domain/        # entities, errors, Result type, pure policies
   config/        # typed environment loading
   db/            # generated Supabase types and admin client
+  jobs/          # JobQueue interface, pg-boss implementation, queue definitions
   observability/ # logger with secret redaction
 supabase/        # SQL migrations, pgTAP tests, local seed
 docs/            # spec, architecture, database, ADRs, runbooks

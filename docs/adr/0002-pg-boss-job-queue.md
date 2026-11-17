@@ -21,6 +21,12 @@ operate.
 
 - No Redis or Temporal to run in Phase 1.
 - The `JobQueue` interface allows replacing pg-boss (Temporal, BullMQ, Supabase Queues) later.
-- To verify before T8: the connection mode pg-boss needs with Supabase (direct connection or session
-  pooler; transaction pooling is likely incompatible). Check the pg-boss and Supabase docs.
+- pg-boss 12 keeps its tables in the `pgboss` schema (outside `public`, so PostgREST never exposes
+  them) and creates/migrates them on start, which needs a role with CREATE on the database.
+- Verified locally against a direct Postgres connection. Still to verify before staging: the
+  Supabase connection mode for the hosted project (direct or session pooler; transaction pooling
+  is not expected to work because pg-boss holds sessions). pg-boss also offers an HTTP proxy
+  package for pooled environments; not evaluated.
+- Queues that must never run the same work twice concurrently use the `exclusive` policy with a
+  `singletonKey` (one queued-or-active job per key). Queue policies cannot change in place.
 - Heavy render queues (Phase 3) may need a dedicated queue or worker pool; revisit then.
