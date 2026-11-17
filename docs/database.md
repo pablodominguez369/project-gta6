@@ -28,6 +28,12 @@ Rules enforced in SQL:
   the row is not terminal: every later attempt reconciles first.
 - `simulated_platform_posts` deliberately allows duplicate keys (like a non-idempotent API), so tests
   can prove the orchestrator never creates one.
+- A feed can only be enabled once its terms URL and review date are recorded.
+- `sources.excerpt` holds at most 300 characters; the full third-party article is never stored.
+- A `confirmed` or `reported` claim must cite at least one source (checked at commit).
+- A script reaches `approved`, `rejected` or `changes_requested` only through an `approvals` row
+  by someone other than its author, and only while it is `in_review`. Approvals are append-only.
+- `created_by` on claims and scripts cannot be changed after insert.
 - Spend limits default to `0` and only an admin can change them.
 - The last admin cannot be removed (role delete or user delete is rejected).
 - `audit_events` rejects UPDATE, DELETE and TRUNCATE for every role, including `service_role`.

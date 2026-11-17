@@ -23,6 +23,37 @@ export type Database = {
   };
   public: {
     Tables: {
+      approvals: {
+        Row: {
+          created_at: string;
+          decision: Database["public"]["Enums"]["approval_decision"];
+          id: string;
+          reason: string | null;
+          reviewer_id: string;
+          target_id: string;
+          target_type: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          decision: Database["public"]["Enums"]["approval_decision"];
+          id?: string;
+          reason?: string | null;
+          reviewer_id?: string;
+          target_id: string;
+          target_type: string;
+        };
+        Update: {
+          created_at?: string;
+          decision?: Database["public"]["Enums"]["approval_decision"];
+          id?: string;
+          reason?: string | null;
+          reviewer_id?: string;
+          target_id?: string;
+          target_type?: string;
+        };
+        Relationships: [];
+      };
       audit_events: {
         Row: {
           action: string;
@@ -106,6 +137,91 @@ export type Database = {
         };
         Relationships: [];
       };
+      claim_sources: {
+        Row: {
+          claim_id: string;
+          created_at: string;
+          quote_hint: string | null;
+          source_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          claim_id: string;
+          created_at?: string;
+          quote_hint?: string | null;
+          source_id: string;
+        };
+        Update: {
+          claim_id?: string;
+          created_at?: string;
+          quote_hint?: string | null;
+          source_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "claim_sources_claim_id_fkey";
+            columns: ["claim_id"];
+            isOneToOne: false;
+            referencedRelation: "claims";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "claim_sources_source_id_fkey";
+            columns: ["source_id"];
+            isOneToOne: false;
+            referencedRelation: "sources";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      claims: {
+        Row: {
+          certainty: Database["public"]["Enums"]["claim_certainty"];
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          opportunity_id: string;
+          sensitive: boolean;
+          text: string;
+          updated_at: string;
+          verified_at: string | null;
+          verified_by: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          certainty: Database["public"]["Enums"]["claim_certainty"];
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          opportunity_id: string;
+          sensitive?: boolean;
+          text: string;
+          updated_at?: string;
+          verified_at?: string | null;
+          verified_by?: string | null;
+        };
+        Update: {
+          certainty?: Database["public"]["Enums"]["claim_certainty"];
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          opportunity_id?: string;
+          sensitive?: boolean;
+          text?: string;
+          updated_at?: string;
+          verified_at?: string | null;
+          verified_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "claims_opportunity_id_fkey";
+            columns: ["opportunity_id"];
+            isOneToOne: false;
+            referencedRelation: "opportunities";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       credential_refs: {
         Row: {
           channel_id: string;
@@ -151,6 +267,61 @@ export type Database = {
           },
         ];
       };
+      feed_sources: {
+        Row: {
+          consecutive_failures: number;
+          created_at: string;
+          created_by: string | null;
+          enabled: boolean;
+          id: string;
+          kind: Database["public"]["Enums"]["feed_kind"];
+          last_polled_at: string | null;
+          poll_minutes: number;
+          publisher: string;
+          source_type: Database["public"]["Enums"]["source_type"];
+          terms_checked_at: string | null;
+          terms_url: string | null;
+          trust_level: number;
+          updated_at: string;
+          url: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          consecutive_failures?: number;
+          created_at?: string;
+          created_by?: string | null;
+          enabled?: boolean;
+          id?: string;
+          kind: Database["public"]["Enums"]["feed_kind"];
+          last_polled_at?: string | null;
+          poll_minutes?: number;
+          publisher: string;
+          source_type: Database["public"]["Enums"]["source_type"];
+          terms_checked_at?: string | null;
+          terms_url?: string | null;
+          trust_level?: number;
+          updated_at?: string;
+          url: string;
+        };
+        Update: {
+          consecutive_failures?: number;
+          created_at?: string;
+          created_by?: string | null;
+          enabled?: boolean;
+          id?: string;
+          kind?: Database["public"]["Enums"]["feed_kind"];
+          last_polled_at?: string | null;
+          poll_minutes?: number;
+          publisher?: string;
+          source_type?: Database["public"]["Enums"]["source_type"];
+          terms_checked_at?: string | null;
+          terms_url?: string | null;
+          trust_level?: number;
+          updated_at?: string;
+          url?: string;
+        };
+        Relationships: [];
+      };
       job_runs: {
         Row: {
           attempt: number;
@@ -193,6 +364,123 @@ export type Database = {
           target_type?: string | null;
         };
         Relationships: [];
+      };
+      llm_usage: {
+        Row: {
+          cost_eur: number;
+          created_at: string;
+          id: string;
+          input_tokens: number;
+          model: string;
+          output_tokens: number;
+          provider: string;
+          purpose: string;
+          request_id: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          cost_eur: number;
+          created_at?: string;
+          id?: string;
+          input_tokens: number;
+          model: string;
+          output_tokens: number;
+          provider: string;
+          purpose: string;
+          request_id?: string | null;
+        };
+        Update: {
+          cost_eur?: number;
+          created_at?: string;
+          id?: string;
+          input_tokens?: number;
+          model?: string;
+          output_tokens?: number;
+          provider?: string;
+          purpose?: string;
+          request_id?: string | null;
+        };
+        Relationships: [];
+      };
+      opportunities: {
+        Row: {
+          certainty: Database["public"]["Enums"]["claim_certainty"];
+          created_at: string;
+          decided_by: string | null;
+          decision_reason: string | null;
+          expires_at: string | null;
+          id: string;
+          risk_flags: string[];
+          score: number;
+          status: Database["public"]["Enums"]["opportunity_status"];
+          summary: string;
+          topic: string;
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          certainty?: Database["public"]["Enums"]["claim_certainty"];
+          created_at?: string;
+          decided_by?: string | null;
+          decision_reason?: string | null;
+          expires_at?: string | null;
+          id?: string;
+          risk_flags?: string[];
+          score?: number;
+          status?: Database["public"]["Enums"]["opportunity_status"];
+          summary?: string;
+          topic: string;
+          updated_at?: string;
+        };
+        Update: {
+          certainty?: Database["public"]["Enums"]["claim_certainty"];
+          created_at?: string;
+          decided_by?: string | null;
+          decision_reason?: string | null;
+          expires_at?: string | null;
+          id?: string;
+          risk_flags?: string[];
+          score?: number;
+          status?: Database["public"]["Enums"]["opportunity_status"];
+          summary?: string;
+          topic?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      opportunity_sources: {
+        Row: {
+          created_at: string;
+          opportunity_id: string;
+          source_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          opportunity_id: string;
+          source_id: string;
+        };
+        Update: {
+          created_at?: string;
+          opportunity_id?: string;
+          source_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_sources_opportunity_id_fkey";
+            columns: ["opportunity_id"];
+            isOneToOne: false;
+            referencedRelation: "opportunities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "opportunity_sources_source_id_fkey";
+            columns: ["source_id"];
+            isOneToOne: false;
+            referencedRelation: "sources";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       publications: {
         Row: {
@@ -257,6 +545,121 @@ export type Database = {
           },
         ];
       };
+      schedule_rules: {
+        Row: {
+          approval_mode: string;
+          cadence_policy: NonNullable<Json>;
+          channel_id: string;
+          created_at: string;
+          created_by: string | null;
+          enabled: boolean;
+          id: string;
+          timezone: string;
+          updated_at: string;
+          windows_json: NonNullable<Json>;
+        };
+        ComputedFields: never;
+        Insert: {
+          approval_mode?: string;
+          cadence_policy?: NonNullable<Json>;
+          channel_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          enabled?: boolean;
+          id?: string;
+          timezone?: string;
+          updated_at?: string;
+          windows_json?: NonNullable<Json>;
+        };
+        Update: {
+          approval_mode?: string;
+          cadence_policy?: NonNullable<Json>;
+          channel_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          enabled?: boolean;
+          id?: string;
+          timezone?: string;
+          updated_at?: string;
+          windows_json?: NonNullable<Json>;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "schedule_rules_channel_id_fkey";
+            columns: ["channel_id"];
+            isOneToOne: true;
+            referencedRelation: "channels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      scripts: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          cta: string | null;
+          id: string;
+          lines_json: NonNullable<Json>;
+          llm_usage_id: string | null;
+          locale: string;
+          opportunity_id: string;
+          prompt_version: string | null;
+          qa_report: NonNullable<Json>;
+          status: Database["public"]["Enums"]["script_status"];
+          target_duration_s: number;
+          updated_at: string;
+          version: number;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          cta?: string | null;
+          id?: string;
+          lines_json?: NonNullable<Json>;
+          llm_usage_id?: string | null;
+          locale?: string;
+          opportunity_id: string;
+          prompt_version?: string | null;
+          qa_report?: NonNullable<Json>;
+          status?: Database["public"]["Enums"]["script_status"];
+          target_duration_s?: number;
+          updated_at?: string;
+          version?: number;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          cta?: string | null;
+          id?: string;
+          lines_json?: NonNullable<Json>;
+          llm_usage_id?: string | null;
+          locale?: string;
+          opportunity_id?: string;
+          prompt_version?: string | null;
+          qa_report?: NonNullable<Json>;
+          status?: Database["public"]["Enums"]["script_status"];
+          target_duration_s?: number;
+          updated_at?: string;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "scripts_llm_usage_id_fkey";
+            columns: ["llm_usage_id"];
+            isOneToOne: false;
+            referencedRelation: "llm_usage";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "scripts_opportunity_id_fkey";
+            columns: ["opportunity_id"];
+            isOneToOne: false;
+            referencedRelation: "opportunities";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       simulated_platform_posts: {
         Row: {
           created_at: string;
@@ -284,6 +687,66 @@ export type Database = {
           status?: string;
         };
         Relationships: [];
+      };
+      sources: {
+        Row: {
+          added_by: string | null;
+          canonical_url: string;
+          content_hash: string | null;
+          created_at: string;
+          excerpt: string | null;
+          feed_source_id: string | null;
+          id: string;
+          observed_at: string;
+          published_at: string | null;
+          publisher: string;
+          source_type: Database["public"]["Enums"]["source_type"];
+          title: string;
+          trust_level: number;
+          url: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          added_by?: string | null;
+          canonical_url: string;
+          content_hash?: string | null;
+          created_at?: string;
+          excerpt?: string | null;
+          feed_source_id?: string | null;
+          id?: string;
+          observed_at?: string;
+          published_at?: string | null;
+          publisher: string;
+          source_type: Database["public"]["Enums"]["source_type"];
+          title: string;
+          trust_level?: number;
+          url: string;
+        };
+        Update: {
+          added_by?: string | null;
+          canonical_url?: string;
+          content_hash?: string | null;
+          created_at?: string;
+          excerpt?: string | null;
+          feed_source_id?: string | null;
+          id?: string;
+          observed_at?: string;
+          published_at?: string | null;
+          publisher?: string;
+          source_type?: Database["public"]["Enums"]["source_type"];
+          title?: string;
+          trust_level?: number;
+          url?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sources_feed_source_id_fkey";
+            columns: ["feed_source_id"];
+            isOneToOne: false;
+            referencedRelation: "feed_sources";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       system_controls: {
         Row: {
@@ -352,12 +815,18 @@ export type Database = {
     };
     Enums: {
       app_role: "admin" | "editor" | "rights_reviewer" | "publisher" | "analyst" | "read_only";
+      approval_decision: "approved" | "changes_requested" | "rejected";
       channel_mode: "draft" | "approval" | "autopublish" | "manual";
+      claim_certainty: "confirmed" | "reported" | "rumor" | "speculation" | "opinion";
       credential_status: "pending" | "active" | "expired" | "revoked";
+      feed_kind: "rss" | "atom";
       job_run_status: "queued" | "running" | "succeeded" | "failed" | "blocked";
+      opportunity_status: "new" | "shortlisted" | "accepted" | "discarded" | "expired";
       platform: "youtube" | "instagram" | "tiktok" | "simulated";
       publication_status:
         "queued" | "in_progress" | "succeeded" | "failed" | "ambiguous" | "blocked";
+      script_status: "draft" | "in_review" | "changes_requested" | "approved" | "rejected";
+      source_type: "official" | "press" | "community" | "social";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -473,11 +942,17 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "editor", "rights_reviewer", "publisher", "analyst", "read_only"],
+      approval_decision: ["approved", "changes_requested", "rejected"],
       channel_mode: ["draft", "approval", "autopublish", "manual"],
+      claim_certainty: ["confirmed", "reported", "rumor", "speculation", "opinion"],
       credential_status: ["pending", "active", "expired", "revoked"],
+      feed_kind: ["rss", "atom"],
       job_run_status: ["queued", "running", "succeeded", "failed", "blocked"],
+      opportunity_status: ["new", "shortlisted", "accepted", "discarded", "expired"],
       platform: ["youtube", "instagram", "tiktok", "simulated"],
       publication_status: ["queued", "in_progress", "succeeded", "failed", "ambiguous", "blocked"],
+      script_status: ["draft", "in_review", "changes_requested", "approved", "rejected"],
+      source_type: ["official", "press", "community", "social"],
     },
   },
 } as const;
