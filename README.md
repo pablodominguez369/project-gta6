@@ -30,6 +30,22 @@ pnpm typecheck
 pnpm test
 ```
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request and on pushes to `main`:
+
+- `checks`: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`.
+- `secret-scan`: gitleaks (pinned version, checksum-verified) over the full git history, using
+  `.gitleaks.toml` (default rules plus Supabase key rules). Any finding fails the build.
+
+To scan locally before pushing (requires the gitleaks binary):
+
+```bash
+gitleaks git --config .gitleaks.toml --redact --verbose .
+```
+
+If a real secret is ever committed: rotate it first, then purge it from history. Never allowlist it.
+
 ## Workspace layout
 
 ```text
