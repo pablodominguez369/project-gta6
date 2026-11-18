@@ -535,6 +535,114 @@ export type Database = {
         };
         Relationships: [];
       };
+      media_project_scenes: {
+        Row: {
+          asset_id: string;
+          project_id: string;
+          scene_index: number;
+        };
+        ComputedFields: never;
+        Insert: {
+          asset_id: string;
+          project_id: string;
+          scene_index: number;
+        };
+        Update: {
+          asset_id?: string;
+          project_id?: string;
+          scene_index?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "media_project_scenes_asset_id_fkey";
+            columns: ["asset_id"];
+            isOneToOne: false;
+            referencedRelation: "assets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "media_project_scenes_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "media_projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      media_projects: {
+        Row: {
+          attempts: number;
+          brand: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          music_asset_id: string | null;
+          next_attempt_at: string | null;
+          script_id: string;
+          status: Database["public"]["Enums"]["media_project_status"];
+          status_reason: string | null;
+          target_platforms: Database["public"]["Enums"]["platform"][];
+          template: string;
+          updated_at: string;
+          voice_id: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          attempts?: number;
+          brand?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          music_asset_id?: string | null;
+          next_attempt_at?: string | null;
+          script_id: string;
+          status?: Database["public"]["Enums"]["media_project_status"];
+          status_reason?: string | null;
+          target_platforms?: Database["public"]["Enums"]["platform"][];
+          template?: string;
+          updated_at?: string;
+          voice_id?: string | null;
+        };
+        Update: {
+          attempts?: number;
+          brand?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          music_asset_id?: string | null;
+          next_attempt_at?: string | null;
+          script_id?: string;
+          status?: Database["public"]["Enums"]["media_project_status"];
+          status_reason?: string | null;
+          target_platforms?: Database["public"]["Enums"]["platform"][];
+          template?: string;
+          updated_at?: string;
+          voice_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "media_projects_music_asset_id_fkey";
+            columns: ["music_asset_id"];
+            isOneToOne: false;
+            referencedRelation: "assets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "media_projects_script_id_fkey";
+            columns: ["script_id"];
+            isOneToOne: false;
+            referencedRelation: "scripts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "media_projects_voice_id_fkey";
+            columns: ["voice_id"];
+            isOneToOne: false;
+            referencedRelation: "voices";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       opportunities: {
         Row: {
           certainty: Database["public"]["Enums"]["claim_certainty"];
@@ -674,6 +782,78 @@ export type Database = {
             columns: ["channel_id"];
             isOneToOne: false;
             referencedRelation: "channels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      renders: {
+        Row: {
+          audio_codec: string | null;
+          checksum: string;
+          created_at: string;
+          disclosure_required: boolean;
+          duration_ms: number;
+          height: number;
+          id: string;
+          manifest: NonNullable<Json>;
+          manifest_path: string;
+          profile: string;
+          project_id: string;
+          qc_passed: boolean;
+          qc_report: NonNullable<Json>;
+          size_bytes: number;
+          storage_path: string;
+          version: number;
+          video_codec: string;
+          width: number;
+        };
+        ComputedFields: never;
+        Insert: {
+          audio_codec?: string | null;
+          checksum: string;
+          created_at?: string;
+          disclosure_required: boolean;
+          duration_ms: number;
+          height: number;
+          id?: string;
+          manifest: NonNullable<Json>;
+          manifest_path: string;
+          profile: string;
+          project_id: string;
+          qc_passed: boolean;
+          qc_report: NonNullable<Json>;
+          size_bytes: number;
+          storage_path: string;
+          version: number;
+          video_codec: string;
+          width: number;
+        };
+        Update: {
+          audio_codec?: string | null;
+          checksum?: string;
+          created_at?: string;
+          disclosure_required?: boolean;
+          duration_ms?: number;
+          height?: number;
+          id?: string;
+          manifest?: NonNullable<Json>;
+          manifest_path?: string;
+          profile?: string;
+          project_id?: string;
+          qc_passed?: boolean;
+          qc_report?: NonNullable<Json>;
+          size_bytes?: number;
+          storage_path?: string;
+          version?: number;
+          video_codec?: string;
+          width?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "renders_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "media_projects";
             referencedColumns: ["id"];
           },
         ];
@@ -1079,6 +1259,7 @@ export type Database = {
       };
       has_role: { Args: { required: Database["public"]["Enums"]["app_role"] }; Returns: boolean };
       is_member: { Args: Record<PropertyKey, never>; Returns: boolean };
+      media_project_is_editable: { Args: { p_project_id: string }; Returns: boolean };
     };
     Enums: {
       app_role: "admin" | "editor" | "rights_reviewer" | "publisher" | "analyst" | "read_only";
@@ -1090,6 +1271,7 @@ export type Database = {
       credential_status: "pending" | "active" | "expired" | "revoked";
       feed_kind: "rss" | "atom";
       job_run_status: "queued" | "running" | "succeeded" | "failed" | "blocked";
+      media_project_status: "draft" | "queued" | "rendering" | "rendered" | "blocked" | "failed";
       opportunity_status: "new" | "shortlisted" | "accepted" | "discarded" | "expired";
       platform: "youtube" | "instagram" | "tiktok" | "simulated";
       publication_status:
@@ -1228,6 +1410,7 @@ export const Constants = {
       credential_status: ["pending", "active", "expired", "revoked"],
       feed_kind: ["rss", "atom"],
       job_run_status: ["queued", "running", "succeeded", "failed", "blocked"],
+      media_project_status: ["draft", "queued", "rendering", "rendered", "blocked", "failed"],
       opportunity_status: ["new", "shortlisted", "accepted", "discarded", "expired"],
       platform: ["youtube", "instagram", "tiktok", "simulated"],
       publication_status: ["queued", "in_progress", "succeeded", "failed", "ambiguous", "blocked"],

@@ -19,8 +19,10 @@ import {
   SCRIPT_STATUS_LABELS,
 } from "@/lib/scripts";
 import { formatDateTime } from "@/lib/format";
+import { MEDIA_STATUS_LABELS } from "@/lib/media";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+import { createMediaProject } from "../../media/actions";
 import { reviewScript, saveScript, submitScript } from "../actions";
 
 const DECISION_LABELS: Readonly<Record<string, string>> = {
@@ -50,7 +52,7 @@ export default async function ScriptPage({ params }: { readonly params: Promise<
     .maybeSingle();
   if (!script) notFound();
 
-  const [claims, { data: approvals }] = await Promise.all([
+  const [claims, { data: approvals }, { data: mediaProjects }] = await Promise.all([
     loadScriptClaims(supabase, script.opportunity_id),
     supabase
       .from("approvals")
@@ -58,7 +60,13 @@ export default async function ScriptPage({ params }: { readonly params: Promise<
       .eq("target_type", "script")
       .eq("target_id", script.id)
       .order("created_at"),
+    supabase
+      .from("media_projects")
+      .select("id, status")
+      .eq("script_id", script.id)
+      .order("created_at"),
   ]);
+  const canCreateVideo = user.roles.includes("admin") || user.roles.includes("editor");
   const canReview =
     (user.roles.includes("admin") || user.roles.includes("editor")) &&
     script.status === "in_review" &&
@@ -280,6 +288,32 @@ export default async function ScriptPage({ params }: { readonly params: Promise<
         <ActionForm action={submitScript} submitLabel="Enviar a revisión">
           <input type="hidden" name="scriptId" value={script.id} />
         </ActionForm>
+      ) : null}
+
+      {script.status === "approved" ? (
+        <div>
+          <h2 className="font-medium">Vídeos</h2>
+          <ul className="mt-1 list-disc pl-5 text-sm">
+            {(mediaProjects ?? []).map((project) => (
+              <li key={project.id}>
+                <Link href={`/admin/media/${project.id}`} className="underline">
+                  Vídeo · {MEDIA_STATUS_LABELS[project.status] ?? project.status}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          {canCreateVideo ? (
+            <form action={createMediaProject} className="mt-2">
+              <input type="hidden" name="scriptId" value={script.id} />
+              <button
+                type="submit"
+                className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-neutral-100 dark:text-neutral-900"
+              >
+                Crear vídeo
+              </button>
+            </form>
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

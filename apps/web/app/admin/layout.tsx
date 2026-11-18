@@ -14,6 +14,7 @@ const NAV: readonly { href: string; label: string; roles: readonly AppRole[] | "
   { href: "/admin/opportunities", label: "Oportunidades", roles: "member" },
   { href: "/admin/scripts", label: "Guiones", roles: "member" },
   { href: "/admin/assets", label: "Derechos", roles: "member" },
+  { href: "/admin/media", label: "Vídeos", roles: "member" },
   { href: "/admin/calendar", label: "Calendario", roles: "member" },
   { href: "/admin/publications", label: "Publicaciones", roles: "member" },
   { href: "/admin/jobs", label: "Jobs", roles: "member" },
