@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import Link from "next/link";
+
 import { ActionForm } from "@/components/action-form";
 import { Field, Select, TextInput } from "@/components/field";
 import { requireRole } from "@/lib/auth/require-role";
@@ -11,10 +13,18 @@ import { enqueueSimulatedPublication } from "./actions";
 const STATUS_LABELS: Record<string, string> = {
   queued: "En cola",
   in_progress: "En curso",
-  succeeded: "Publicada (simulada)",
+  succeeded: "Publicada",
   failed: "Fallida",
   ambiguous: "Ambigua: requiere reconciliación",
   blocked: "Bloqueada",
+  awaiting_manual: "Lista para subir a mano",
+};
+
+const PLATFORM_LABELS: Record<string, string> = {
+  simulated: "Simulado",
+  youtube: "YouTube",
+  instagram: "Instagram",
+  tiktok: "TikTok",
 };
 
 /** Why a publication stopped, in plain words. */
@@ -24,6 +34,9 @@ const ERROR_LABELS: Record<string, string> = {
   SYSTEM_PAUSED: "Pausa global activa.",
   CHANNEL_PAUSED: "El canal está en pausa.",
   RATE_LIMITED: "Límite de frecuencia del canal: se reintentará.",
+  FORBIDDEN:
+    "Subida real no permitida en este canal (falta activarla o la plataforma no lo admite).",
+  CREDENTIAL_EXPIRED: "La cuenta del canal no está conectada o su permiso caducó.",
 };
 
 export default async function PublicationsPage() {
@@ -34,14 +47,13 @@ export default async function PublicationsPage() {
     supabase
       .from("publications")
       .select(
-        "id, status, error_code, external_id, permalink, payload_json, published_at, created_at, channels(display_name)",
+        "id, status, error_code, external_id, permalink, payload_json, published_at, created_at, channels(display_name, platform)",
       )
       .order("created_at", { ascending: false })
       .limit(50),
     supabase
       .from("channels")
-      .select("id, display_name")
-      .eq("platform", "simulated")
+      .select("id, display_name, platform, mode, live_uploads_enabled")
       .order("created_at", { ascending: true }),
     supabase
       .from("renders")
@@ -51,19 +63,26 @@ export default async function PublicationsPage() {
       .order("created_at", { ascending: false })
       .limit(30),
   ]);
+  // Channels that can take a publication now: the simulator, manual channels, or real channels
+  // an admin switched on for private uploads. The worker re-checks everything.
+  const usableChannels = (channels ?? []).filter(
+    (channel) =>
+      channel.platform === "simulated" || channel.mode === "manual" || channel.live_uploads_enabled,
+  );
 
   return (
     <section className="flex flex-col gap-6">
       <h1 className="text-xl font-semibold">Publicaciones</h1>
       <p className="text-sm text-neutral-600 dark:text-neutral-400">
-        Solo publicación simulada: nada sale a ninguna plataforma real. Antes de cada intento se
-        vuelven a comprobar los derechos, la voz y el control técnico del vídeo.
+        Nada se publica en público. Los canales simulados no salen a ninguna plataforma; los canales
+        en modo manual preparan un paquete para que lo subas tú. Antes de cada intento se vuelven a
+        comprobar los derechos, la voz y el control técnico del vídeo.
       </p>
 
       {canEnqueue ? (
         <div className="max-w-md rounded border border-neutral-200 p-4 dark:border-neutral-800">
-          <h2 className="mb-3 font-medium">Encolar publicación simulada</h2>
-          {channels && channels.length > 0 ? (
+          <h2 className="mb-3 font-medium">Encolar publicación</h2>
+          {usableChannels.length > 0 ? (
             <ActionForm
               action={enqueueSimulatedPublication}
               submitLabel="Encolar"
@@ -74,9 +93,9 @@ export default async function PublicationsPage() {
               <Field label="Canal">
                 <Select
                   name="channelId"
-                  options={channels.map((channel) => ({
+                  options={usableChannels.map((channel) => ({
                     value: channel.id,
-                    label: channel.display_name,
+                    label: `${channel.display_name} · ${PLATFORM_LABELS[channel.platform] ?? channel.platform}${channel.mode === "manual" ? " (manual)" : ""}`,
                   }))}
                 />
               </Field>
@@ -100,7 +119,9 @@ export default async function PublicationsPage() {
               </Field>
             </ActionForm>
           ) : (
-            <p className="text-sm">No hay canales simulados. Crea uno en Canales.</p>
+            <p className="text-sm">
+              No hay canales disponibles. Crea uno simulado o en modo manual en Canales.
+            </p>
           )}
         </div>
       ) : null}
@@ -129,14 +150,37 @@ export default async function PublicationsPage() {
                   <td className="py-2 pr-4">{titleOf(publication.payload_json)}</td>
                   <td className="py-2 pr-4">{publication.channels.display_name}</td>
                   <td className="py-2 pr-4">
-                    {STATUS_LABELS[publication.status] ?? publication.status}
+                    {publication.status === "awaiting_manual" ? (
+                      <Link
+                        href={`/admin/publications/${publication.id}`}
+                        className="underline"
+                        data-testid={`manual-package-${publication.id}`}
+                      >
+                        {STATUS_LABELS.awaiting_manual}
+                      </Link>
+                    ) : (
+                      (STATUS_LABELS[publication.status] ?? publication.status)
+                    )}
                   </td>
                   <td className="py-2 pr-4">
                     {publication.error_code
                       ? (ERROR_LABELS[publication.error_code] ?? publication.error_code)
                       : "—"}
                   </td>
-                  <td className="py-2 pr-4 font-mono text-xs">{publication.external_id ?? "—"}</td>
+                  <td className="py-2 pr-4 font-mono text-xs">
+                    {publication.permalink ? (
+                      <a
+                        href={publication.permalink}
+                        className="underline"
+                        rel="noopener noreferrer"
+                        target="_blank"
+                      >
+                        {publication.external_id ?? "enlace"}
+                      </a>
+                    ) : (
+                      (publication.external_id ?? "—")
+                    )}
+                  </td>
                   <td className="py-2 pr-4">{formatDateTime(publication.created_at)}</td>
                   <td className="py-2">{formatDateTime(publication.published_at)}</td>
                 </tr>
