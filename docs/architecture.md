@@ -261,3 +261,15 @@ each video page lists what a failed QC asked for (T27).
 - [ADR 0003](adr/0003-secret-references.md): secrets are referenced, never stored
 
 Connectors and the publisher contract: [connectors.md](connectors.md).
+
+## Publishing to real platforms (Phase 4)
+
+See [ADR 0005](adr/0005-live-publishing-gates.md) and [platforms.md](platforms.md).
+
+- The orchestrator picks the adapter by the channel's platform. A real platform needs
+  `PUBLISHING_MODE=live`, the channel's `live_uploads_enabled` switch and an active credential;
+  otherwise the attempt fails before any call. Only private uploads exist (`upload_visibility`).
+- Adapters save a checkpoint (`publications.platform_checkpoint`) before every step whose
+  outcome could be lost, and `reconcile` receives it on the next attempt.
+- `manual` channels go through every gate and then wait as `awaiting_manual`; a person uploads
+  the package and records the link ([runbook](runbooks/manual-publication.md)).

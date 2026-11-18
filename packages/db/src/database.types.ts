@@ -1265,6 +1265,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      complete_manual_publication: {
+        Args: { permalink: string; publication_id: string };
+        Returns: undefined;
+      };
       create_claim: {
         Args: {
           p_certainty: Database["public"]["Enums"]["claim_certainty"];
@@ -1297,7 +1301,13 @@ export type Database = {
       opportunity_status: "new" | "shortlisted" | "accepted" | "discarded" | "expired";
       platform: "youtube" | "instagram" | "tiktok" | "simulated";
       publication_status:
-        "queued" | "in_progress" | "succeeded" | "failed" | "ambiguous" | "blocked";
+        | "queued"
+        | "in_progress"
+        | "succeeded"
+        | "failed"
+        | "ambiguous"
+        | "blocked"
+        | "awaiting_manual";
       rights_status:
         | "original"
         | "cleared"
@@ -1436,7 +1446,15 @@ export const Constants = {
       media_project_status: ["draft", "queued", "rendering", "rendered", "blocked", "failed"],
       opportunity_status: ["new", "shortlisted", "accepted", "discarded", "expired"],
       platform: ["youtube", "instagram", "tiktok", "simulated"],
-      publication_status: ["queued", "in_progress", "succeeded", "failed", "ambiguous", "blocked"],
+      publication_status: [
+        "queued",
+        "in_progress",
+        "succeeded",
+        "failed",
+        "ambiguous",
+        "blocked",
+        "awaiting_manual",
+      ],
       rights_status: [
         "original",
         "cleared",

@@ -358,3 +358,50 @@ describe("processPublication on real platforms (ADR 0005)", () => {
     expect(adapter.uploads).toHaveLength(1);
   });
 });
+
+describe("processPublication on manual channels (T30)", () => {
+  function manualSetup() {
+    const store = new MemoryPublicationStore();
+    store.platform = "instagram";
+    store.mode = "manual";
+    store.media = cleanMedia();
+    store.payload = {
+      title: "Título",
+      description: "",
+      mediaRef: "renders/x/master.mp4",
+      syntheticMedia: true,
+    };
+    const adapter = new CheckpointingFakeAdapter();
+    const run = (attempt = 1) =>
+      processPublication(
+        {
+          store,
+          publishers: { youtube: adapter },
+          publishingMode: "simulated",
+          logger,
+          now: () => NOW,
+        },
+        { publicationId: store.id, attempt, maxAttempts: 4 },
+      );
+    return { store, adapter, run };
+  }
+
+  it("passes the gates and waits for a person, without calling any adapter", async () => {
+    const { store, adapter, run } = manualSetup();
+    expect(await run()).toEqual({ kind: "manual_ready" });
+    expect(store.row.status).toBe("awaiting_manual");
+    expect(adapter.uploads).toEqual([]);
+    expect(store.audit.map((event) => event.action)).toEqual(["publications.manual_package_ready"]);
+    expect(await run(2)).toEqual({ kind: "skipped", reason: "awaiting_manual" });
+  });
+
+  it("still applies the rights gate and pauses", async () => {
+    const blocked = manualSetup();
+    blocked.store.media = { ...cleanMedia(), qcPassed: false };
+    expect(await blocked.run()).toEqual({ kind: "failed", code: "RIGHTS_BLOCKED" });
+
+    const paused = manualSetup();
+    paused.store.channelPaused = true;
+    expect(await paused.run()).toEqual({ kind: "blocked", code: "CHANNEL_PAUSED" });
+  });
+});

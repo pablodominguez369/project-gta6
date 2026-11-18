@@ -28,6 +28,7 @@ export function createPublishHandler(
     switch (outcome.kind) {
       case "succeeded":
       case "skipped":
+      case "manual_ready":
         return { status: "succeeded" };
       case "blocked":
         return { status: "blocked", errorCode: outcome.code };

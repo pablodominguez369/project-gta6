@@ -87,11 +87,27 @@ describe("evaluatePublishGates", () => {
     expect(!noCredential.ok && noCredential.error.code).toBe("CREDENTIAL_EXPIRED");
   });
 
-  it("never calls a platform for a manual channel", () => {
-    const manual = evaluatePublishGates({ ...liveYoutube, channelMode: "manual" });
-    expect(!manual.ok && manual.error.code).toBe("FORBIDDEN");
-    const simulatedManual = evaluatePublishGates({ ...openGates, channelMode: "manual" });
-    expect(!simulatedManual.ok && simulatedManual.error.code).toBe("FORBIDDEN");
+  it("lets a manual channel through without the live keys (it never calls a platform)", () => {
+    const manual = evaluatePublishGates({
+      ...openGates,
+      platform: "instagram",
+      channelMode: "manual",
+    });
+    expect(manual.ok).toBe(true);
+    const pausedManual = evaluatePublishGates({
+      ...openGates,
+      platform: "instagram",
+      channelMode: "manual",
+      channelPaused: true,
+    });
+    expect(!pausedManual.ok && pausedManual.error.code).toBe("CHANNEL_PAUSED");
+  });
+
+  it("an awaiting_manual publication only ends as succeeded or failed", () => {
+    expect(canTransition("in_progress", "awaiting_manual")).toBe(true);
+    expect(canTransition("awaiting_manual", "succeeded")).toBe(true);
+    expect(canTransition("awaiting_manual", "in_progress")).toBe(false);
+    expect(isTerminal("awaiting_manual")).toBe(false);
   });
 
   it("pauses win over everything, even in live mode", () => {

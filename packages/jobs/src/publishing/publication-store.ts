@@ -58,6 +58,8 @@ export type PublicationUpdate =
       readonly errorCode?: ErrorCode;
     }
   | { readonly status: "ambiguous" | "failed"; readonly errorCode: ErrorCode }
+  /** Manual channel: every gate passed; a person uploads the package. */
+  | { readonly status: "awaiting_manual" }
   | { readonly status: "blocked"; readonly errorCode: ErrorCode; readonly nextAttemptAt: Date };
 
 export interface WorkerAuditEvent {
@@ -115,7 +117,7 @@ interface ContextRow {
 }
 
 /** Updates never touch a terminal row, whatever the caller asks for. */
-const NOT_TERMINAL = "status not in ('succeeded', 'failed')";
+const NOT_TERMINAL = "status not in ('succeeded', 'failed', 'awaiting_manual')";
 
 /**
  * Postgres implementation. Uses a direct connection (the worker's DATABASE_URL), which bypasses

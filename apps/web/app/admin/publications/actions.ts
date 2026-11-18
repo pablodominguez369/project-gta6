@@ -1,6 +1,6 @@
 "use server";
 
-import { publicationPayloadSchema } from "@gta6/domain";
+import { isPlatformPermalink, publicationPayloadSchema } from "@gta6/domain";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -61,11 +61,20 @@ export async function enqueueSimulatedPublication(
 
   const { data: channel } = await supabase
     .from("channels")
-    .select("platform")
+    .select("platform, mode, live_uploads_enabled")
     .eq("id", input.data.channelId)
     .maybeSingle();
-  if (channel?.platform !== "simulated") {
-    return actionError("Solo se puede encolar en canales simulados durante la Fase 1.");
+  if (!channel) return actionError("Ese canal no existe.");
+  // Real platforms: by hand (manual mode) or, once an admin switched it on, private uploads.
+  const allowed =
+    channel.platform === "simulated" || channel.mode === "manual" || channel.live_uploads_enabled;
+  if (!allowed) {
+    return actionError(
+      "Este canal no tiene subida real activada. Ponlo en modo manual para publicarlo a mano.",
+    );
+  }
+  if (channel.platform !== "simulated" && !render) {
+    return actionError("Para una plataforma real hay que elegir un vídeo.");
   }
 
   const { error } = await supabase.from("publications").insert({
@@ -87,5 +96,55 @@ export async function enqueueSimulatedPublication(
   }
 
   revalidatePath("/admin/publications");
-  return actionOk("Publicación simulada encolada.");
+  return actionOk(
+    channel.mode === "manual"
+      ? "Encolada. Cuando pase los controles, tendrás el paquete para subirlo a mano."
+      : "Publicación encolada.",
+  );
+}
+
+const manualCompletionSchema = z.object({
+  publicationId: z.uuid(),
+  permalink: z.string().trim().min(1).max(500),
+});
+
+/**
+ * Records that a person uploaded the manual package. The database function re-checks the role
+ * and that the publication is waiting for a manual upload, then audits it.
+ */
+export async function completeManualPublication(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole(["admin", "publisher"]);
+  const input = manualCompletionSchema.safeParse({
+    publicationId: formData.get("publicationId"),
+    permalink: formData.get("permalink"),
+  });
+  if (!input.success) return actionError("Pega el enlace de la publicación.");
+
+  const supabase = await createSupabaseServerClient();
+  const { data: publication } = await supabase
+    .from("publications")
+    .select("status, channels(platform)")
+    .eq("id", input.data.publicationId)
+    .maybeSingle();
+  if (publication?.status !== "awaiting_manual") {
+    return actionError("Esta publicación no está esperando una subida manual.");
+  }
+  if (!isPlatformPermalink(publication.channels.platform, input.data.permalink)) {
+    return actionError("El enlace debe ser https y de la propia plataforma.");
+  }
+
+  const { error } = await supabase.rpc("complete_manual_publication", {
+    publication_id: input.data.publicationId,
+    permalink: input.data.permalink,
+  });
+  if (error) {
+    logger.error({ dbErrorCode: error.code }, "manual publication completion failed");
+    return actionError("No se pudo registrar la publicación.");
+  }
+  revalidatePath("/admin/publications");
+  revalidatePath(`/admin/publications/${input.data.publicationId}`);
+  return actionOk("Publicación registrada.");
 }

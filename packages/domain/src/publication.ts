@@ -11,16 +11,20 @@ export const PUBLICATION_STATUSES = [
   "failed",
   "ambiguous",
   "blocked",
+  /** Gates passed on a manual channel; a person uploads the package by hand (T30). */
+  "awaiting_manual",
 ] as const;
 export type PublicationStatus = (typeof PUBLICATION_STATUSES)[number];
 
 const TRANSITIONS: Readonly<Record<PublicationStatus, readonly PublicationStatus[]>> = {
   queued: ["in_progress", "blocked"],
   blocked: ["in_progress", "blocked", "queued"],
-  in_progress: ["succeeded", "failed", "ambiguous", "in_progress", "blocked"],
+  in_progress: ["succeeded", "failed", "ambiguous", "in_progress", "blocked", "awaiting_manual"],
   // An ambiguous publication is resolved through reconciliation. It may be blocked by a pause;
   // `reconcile_required` keeps the next attempt reconciling first.
   ambiguous: ["in_progress", "succeeded", "failed", "ambiguous", "blocked"],
+  // Completed by a person (complete_manual_publication) or abandoned.
+  awaiting_manual: ["succeeded", "failed"],
   succeeded: [],
   failed: [],
 };
@@ -65,7 +69,7 @@ export interface GateInput {
   readonly publishingMode: PublishingMode;
   /** Channel switch set by an admin with a reason (ADR 0005). */
   readonly liveUploadsEnabled: boolean;
-  /** Channel mode; manual channels never call a platform. */
+  /** Channel mode; manual channels never call a platform, so they skip the live keys. */
   readonly channelMode: string;
   /** The channel has an active, unexpired credential reference. */
   readonly credentialActive: boolean;
@@ -84,10 +88,8 @@ export function evaluatePublishGates(input: GateInput): Result<true, DomainError
   if (input.channelPaused) {
     return err(new DomainError("CHANNEL_PAUSED", "Channel is paused"));
   }
-  if (input.channelMode === "manual") {
-    return err(new DomainError("FORBIDDEN", "Manual channels are published by hand"));
-  }
-  if (input.platform === "simulated") return ok(true);
+  // Manual channels and the simulator never reach a real platform from the worker.
+  if (input.channelMode === "manual" || input.platform === "simulated") return ok(true);
   if (input.publishingMode !== "live") {
     // Development and CI never reach a real platform (rule 1).
     return err(new DomainError("FORBIDDEN", "Real uploads are disabled in this worker"));

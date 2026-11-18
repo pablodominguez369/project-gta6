@@ -34,7 +34,9 @@ export interface ProcessPublicationInput {
 
 export type PublicationOutcome =
   | { readonly kind: "succeeded"; readonly via: "publish" | "reconcile" }
-  | { readonly kind: "skipped"; readonly reason: "not_found" | "terminal" }
+  | { readonly kind: "skipped"; readonly reason: "not_found" | "terminal" | "awaiting_manual" }
+  /** Manual channel: gates passed and the package waits for a person to upload it. */
+  | { readonly kind: "manual_ready" }
   /** Stopped by a pause or a frequency limit; the dispatcher picks it up again later. */
   | { readonly kind: "blocked"; readonly code: ErrorCode }
   | { readonly kind: "failed"; readonly code: ErrorCode }
@@ -91,6 +93,9 @@ async function attempt(
   const context = await store.loadContext(id);
   if (!context) return { kind: "skipped", reason: "not_found" };
   if (isTerminal(context.publication.status)) return { kind: "skipped", reason: "terminal" };
+  if (context.publication.status === "awaiting_manual") {
+    return { kind: "skipped", reason: "awaiting_manual" };
+  }
 
   const gates = evaluatePublishGates({
     systemPaused: context.systemPaused,
@@ -112,17 +117,19 @@ async function attempt(
     return { kind: "blocked", code };
   }
 
-  const publisher = deps.publishers[context.channel.platform];
+  // Manual channels never call a platform: they pass the same gates and wait for a person.
+  const manual = context.channel.mode === "manual";
+  const publisher = manual ? null : deps.publishers[context.channel.platform];
   // Phase 4 only uploads privately; an adapter that cannot (Instagram) is never called.
   if (
-    publisher?.platform !== context.channel.platform ||
-    !publisher.capabilities.privateVisibility
+    !manual &&
+    (publisher?.platform !== context.channel.platform || !publisher.capabilities.privateVisibility)
   ) {
     await store.update(id, { status: "failed", errorCode: "FORBIDDEN" });
     await store.recordAudit({
       action: "publications.platform_refused",
       publicationId: id,
-      details: { platform: context.channel.platform, hasAdapter: publisher !== undefined },
+      details: { platform: context.channel.platform, hasAdapter: Boolean(publisher) },
     });
     return { kind: "failed", code: "FORBIDDEN" };
   }
@@ -146,7 +153,7 @@ async function attempt(
 
   await store.update(id, { status: "in_progress" });
 
-  if (context.publication.reconcileRequired) {
+  if (publisher && context.publication.reconcileRequired) {
     const reconciled = await publisher.reconcile(request, checkpoint);
     if (!reconciled.ok) {
       logger.warn({ errorCode: reconciled.error.code }, "reconciliation failed");
@@ -194,6 +201,17 @@ async function attempt(
   if (!frequency.ok) {
     await block(store, id, frequency.error.code, now());
     return { kind: "blocked", code: frequency.error.code };
+  }
+
+  if (manual || !publisher) {
+    // Same gates as an automatic upload, then a person takes over (T30). Nothing is sent.
+    await store.update(id, { status: "awaiting_manual" });
+    await store.recordAudit({
+      action: "publications.manual_package_ready",
+      publicationId: id,
+      details: { platform: context.channel.platform },
+    });
+    return { kind: "manual_ready" };
   }
 
   // Committed BEFORE the call: if the process dies mid-request, the next attempt reconciles.

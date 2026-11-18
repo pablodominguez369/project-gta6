@@ -89,7 +89,9 @@ export class MemoryPublicationStore implements PublicationStore {
   }
 
   update(_publicationId: string, update: PublicationUpdate): Promise<void> {
-    if (this.row.status === "succeeded" || this.row.status === "failed") return Promise.resolve();
+    if (["succeeded", "failed", "awaiting_manual"].includes(this.row.status)) {
+      return Promise.resolve();
+    }
     this.row.status = update.status;
     this.row.errorCode = "errorCode" in update ? (update.errorCode ?? null) : null;
     this.row.nextAttemptAt = "nextAttemptAt" in update ? update.nextAttemptAt : null;

@@ -126,7 +126,7 @@ describe("admin console", () => {
     await form.getByLabel("Título").fill(title);
     const key = await form.locator('input[name="idempotencyKey"]').inputValue();
     await form.getByRole("button", { name: "Encolar" }).click();
-    await page.getByText("Publicación simulada encolada.").waitFor();
+    await page.getByText("Publicación encolada.").waitFor();
 
     const { data: rows } = await adminClient
       .from("publications")
