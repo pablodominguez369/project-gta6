@@ -224,3 +224,97 @@ export async function reviewAsset(
   revalidatePath("/admin/assets");
   return actionOk("Decisión guardada.");
 }
+
+const voiceSchema = z.object({
+  provider: z
+    .string()
+    .trim()
+    .regex(/^[a-z][a-z0-9_-]{1,49}$/),
+  providerVoiceId: z.string().trim().min(1).max(200),
+  displayName: z.string().trim().min(1).max(100),
+  locale: z.enum(["es-ES", "es-419"]),
+  licenseId: z
+    .string()
+    .transform((value) => (value === "" ? null : value))
+    .pipe(z.uuid().nullable()),
+  imitatesRealPerson: z.boolean(),
+});
+
+/**
+ * A rights reviewer registers a voice. It is not usable until approved; a voice that imitates a
+ * real person can never be approved here, because consent proof upload is not available yet.
+ */
+export async function createVoice(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireRole([...REVIEW_ROLES]);
+  const parsed = voiceSchema.safeParse({
+    provider: text(formData.get("provider")),
+    providerVoiceId: text(formData.get("providerVoiceId")),
+    displayName: text(formData.get("displayName")),
+    locale: formData.get("locale"),
+    licenseId: text(formData.get("licenseId")),
+    imitatesRealPerson: formData.get("imitatesRealPerson") === "on",
+  });
+  if (!parsed.success) {
+    return actionError("Revisa la voz: proveedor en minúsculas, identificador y nombre.");
+  }
+  const input = parsed.data;
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("voices").insert({
+    provider: input.provider,
+    provider_voice_id: input.providerVoiceId,
+    display_name: input.displayName,
+    locale: input.locale,
+    license_id: input.licenseId,
+    imitates_real_person: input.imitatesRealPerson,
+    created_by: user.id,
+  });
+  if (error?.code === "23505") return actionError("Esa voz ya está registrada.");
+  if (error) {
+    logger.error({ dbErrorCode: error.code }, "voice create failed");
+    return actionError("No se pudo guardar la voz.");
+  }
+  revalidatePath("/admin/assets");
+  return actionOk("Voz registrada. Apruébala cuando tengas su licencia.");
+}
+
+const voiceDecisionSchema = z.object({
+  voiceId: z.uuid(),
+  decision: z.enum(["approve", "revoke"]),
+});
+
+/** Approve or revoke a voice. The database refuses approvals without license or consent. */
+export async function decideVoice(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireRole([...REVIEW_ROLES]);
+  const parsed = voiceDecisionSchema.safeParse({
+    voiceId: formData.get("voiceId"),
+    decision: formData.get("decision"),
+  });
+  if (!parsed.success) return actionError("Decisión no válida.");
+  const now = new Date().toISOString();
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("voices")
+    .update(
+      parsed.data.decision === "approve"
+        ? { approved_at: now, approved_by: user.id, revoked_at: null }
+        : { revoked_at: now },
+    )
+    .eq("id", parsed.data.voiceId);
+  if (error?.code === "23514") {
+    return actionError(
+      "No se puede aprobar: falta la licencia o, si imita a una persona real, su consentimiento.",
+    );
+  }
+  if (error) {
+    logger.error({ dbErrorCode: error.code }, "voice decision failed");
+    return actionError("No se pudo guardar la decisión.");
+  }
+  revalidatePath("/admin/assets");
+  return actionOk(parsed.data.decision === "approve" ? "Voz aprobada." : "Voz retirada.");
+}

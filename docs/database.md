@@ -47,6 +47,13 @@ Rules enforced in SQL:
 - Storage bucket `media` is private (200 MB, allowed types only). Clients upload to `assets/`
   (editors, reviewers) and `licenses/` (reviewers) and cannot overwrite or delete; renders are
   written by the worker.
+- `voices`: only rights reviewers/admins create or approve. An approved voice needs a license
+  (except the `fake` development provider) and, if it imitates a real person, consent proof;
+  changing what was approved withdraws the approval. Disclosure of synthetic voice is on by
+  default and can only be turned off with a written reason.
+- Deleting a user clears `created_by` (authorship is otherwise immutable). Users who reviewed
+  something that must stay attributed (approvals, rights decisions, voice approvals) cannot be
+  deleted: remove their roles instead.
 - Spend limits default to `0` and only an admin can change them.
 - The last admin cannot be removed (role delete or user delete is rejected).
 - `audit_events` rejects UPDATE, DELETE and TRUNCATE for every role, including `service_role`.

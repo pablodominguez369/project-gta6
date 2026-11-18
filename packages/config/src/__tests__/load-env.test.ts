@@ -121,4 +121,15 @@ describe("loadEnv", () => {
     });
     expect(!result.ok && result.error.message).toContain("LLM_PROVIDER");
   });
+
+  it("keeps TTS disabled by default and the fake TTS local only", () => {
+    const result = loadEnv(workerEnvSchema, validWorkerEnv);
+    expect(result.ok && result.value.TTS_PROVIDER).toBe("disabled");
+    const fake = loadEnv(workerEnvSchema, {
+      ...validWorkerEnv,
+      APP_ENV: "production",
+      TTS_PROVIDER: "fake",
+    });
+    expect(!fake.ok && fake.error.message).toContain("TTS_PROVIDER");
+  });
 });

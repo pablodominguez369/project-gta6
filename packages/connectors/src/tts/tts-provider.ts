@@ -1,34 +1,32 @@
 import type { DomainError, Result } from "@gta6/domain";
 
 /**
- * Contract only (Phase 1). Implementations arrive in Phase 3. A voice can only be used when its
- * license and consent are recorded (rule 5); synthetic-content disclosure is tracked per output.
+ * Text to speech. Callers check the voice with `evaluateVoice` (license, consent, approval)
+ * before every call (rule 5), and every billable call goes through the spend gate.
  */
-export interface VoiceLicense {
-  readonly provider: string;
-  readonly voiceId: string;
-  /** Reference to the stored license/consent proof. */
-  readonly licenseRef: string;
-  /** True only for voices that do not imitate an identifiable person without consent. */
-  readonly cloningConsentVerified: boolean;
-}
-
 export interface TtsRequest {
   readonly text: string;
   readonly locale: "es-ES" | "es-419";
-  readonly voice: VoiceLicense;
+  /** The provider's own voice id, from an approved `voices` row. */
+  readonly providerVoiceId: string;
 }
 
 export interface TtsResult {
-  readonly audioRef: string;
+  /** Encoded audio. WAV (PCM) or MP3, as reported in `mimeType`. */
+  readonly audio: Uint8Array;
+  readonly mimeType: "audio/wav" | "audio/mpeg";
   readonly durationMs: number;
   readonly provider: string;
-  readonly voiceId: string;
-  readonly syntheticDisclosureRequired: boolean;
-  readonly estimatedCostEur: number;
+  /** Provider model or engine used, for the manifest. */
+  readonly model: string;
+  readonly characters: number;
+  readonly costEur: number;
+  readonly requestId: string | null;
 }
 
 export interface TtsProvider {
   readonly name: string;
+  /** Upper bound of what one call may cost, checked by the spend gate before calling. */
+  maxCostEur(text: string): number;
   synthesize(request: TtsRequest): Promise<Result<TtsResult, DomainError>>;
 }

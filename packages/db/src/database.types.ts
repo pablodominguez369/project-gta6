@@ -992,6 +992,72 @@ export type Database = {
         };
         Relationships: [];
       };
+      voices: {
+        Row: {
+          approved_at: string | null;
+          approved_by: string | null;
+          consent_proof_path: string | null;
+          created_at: string;
+          created_by: string | null;
+          disclosure_note: string;
+          disclosure_required: boolean;
+          display_name: string;
+          id: string;
+          imitates_real_person: boolean;
+          license_id: string | null;
+          locale: string;
+          provider: string;
+          provider_voice_id: string;
+          revoked_at: string | null;
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          approved_at?: string | null;
+          approved_by?: string | null;
+          consent_proof_path?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          disclosure_note?: string;
+          disclosure_required?: boolean;
+          display_name: string;
+          id?: string;
+          imitates_real_person?: boolean;
+          license_id?: string | null;
+          locale?: string;
+          provider: string;
+          provider_voice_id: string;
+          revoked_at?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          approved_at?: string | null;
+          approved_by?: string | null;
+          consent_proof_path?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          disclosure_note?: string;
+          disclosure_required?: boolean;
+          display_name?: string;
+          id?: string;
+          imitates_real_person?: boolean;
+          license_id?: string | null;
+          locale?: string;
+          provider?: string;
+          provider_voice_id?: string;
+          revoked_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "voices_license_id_fkey";
+            columns: ["license_id"];
+            isOneToOne: false;
+            referencedRelation: "licenses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;

@@ -37,8 +37,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await browser.close();
-  // Assets and licenses are never deleted by design (audit); their creators are set to null.
-  await Promise.all([editor, reviewer].map(deleteTestUser));
+  // Assets and licenses are never deleted (audit). The reviewer stays: rights decisions keep
+  // their reviewer (on delete restrict), like approvals.
+  await deleteTestUser(editor);
 });
 
 describe("rights registry", () => {
@@ -122,5 +123,56 @@ describe("rights registry", () => {
       .single();
     expect(cleared).toEqual({ rights_status: "cleared", reviewed_by: reviewer.id });
     await second.close();
+  });
+  it("a reviewer approves a licensed or fake voice but not an unlicensed one", async () => {
+    const page = await browser.newPage();
+    await signIn(page, reviewer);
+    await page.waitForURL(`${baseUrl}/admin`);
+    await page.goto(`${baseUrl}/admin/assets`);
+
+    for (const [provider, name] of [
+      ["fake", `Voz de prueba ${run.slice(0, 8)}`],
+      ["acme", `Voz sin licencia ${run.slice(0, 8)}`],
+    ] as const) {
+      const form = page.getByTestId("new-voice");
+      await form.getByLabel(/^Proveedor/).fill(provider);
+      await form.getByLabel("Identificador de la voz en el proveedor").fill(`v-${run}`);
+      await form.getByLabel("Nombre", { exact: true }).fill(name);
+      await form.getByRole("button", { name: "Guardar voz" }).click();
+      await form.getByText(/Voz registrada/).waitFor();
+      await page.reload();
+    }
+
+    const { data: voices } = await adminClient
+      .from("voices")
+      .select("id, provider")
+      .eq("provider_voice_id", `v-${run}`);
+    const fakeId = String(voices?.find((v) => v.provider === "fake")?.id);
+    const acmeId = String(voices?.find((v) => v.provider === "acme")?.id);
+
+    await page.getByTestId(`voice-${acmeId}`).getByRole("button", { name: "Aprobar" }).click();
+    await page
+      .getByTestId(`voice-${acmeId}`)
+      .getByText(/falta la licencia/)
+      .waitFor();
+
+    await page.getByTestId(`voice-${fakeId}`).getByRole("button", { name: "Aprobar" }).click();
+    await page
+      .getByTestId(`voice-${fakeId}`)
+      .getByText(/Voz aprobada/)
+      .waitFor();
+    await page.reload();
+    await page
+      .getByTestId(`voice-${fakeId}`)
+      .getByText(/Se puede usar/)
+      .waitFor();
+
+    const { data: approved } = await adminClient
+      .from("voices")
+      .select("approved_by")
+      .eq("id", fakeId)
+      .single();
+    expect(approved?.approved_by).toBe(reviewer.id);
+    await page.close();
   });
 });
