@@ -15,6 +15,17 @@ const openGates = {
   channelPaused: false,
   platform: "simulated",
   publishingMode: "simulated" as const,
+  liveUploadsEnabled: false,
+  channelMode: "draft",
+  credentialActive: false,
+};
+
+const liveYoutube = {
+  ...openGates,
+  platform: "youtube",
+  publishingMode: "live" as const,
+  liveUploadsEnabled: true,
+  credentialActive: true,
 };
 
 describe("publication state machine", () => {
@@ -56,9 +67,36 @@ describe("evaluatePublishGates", () => {
     expect(!channel.ok && channel.error.code).toBe("CHANNEL_PAUSED");
   });
 
-  it.each(["youtube", "instagram", "tiktok"])("refuses real platform %s in Phase 1", (platform) => {
-    const result = evaluatePublishGates({ ...openGates, platform });
-    expect(!result.ok && result.error.code).toBe("FORBIDDEN");
+  it.each(["youtube", "instagram", "tiktok"])(
+    "refuses real platform %s while the worker is simulated",
+    (platform) => {
+      const result = evaluatePublishGates({
+        ...liveYoutube,
+        platform,
+        publishingMode: "simulated",
+      });
+      expect(!result.ok && result.error.code).toBe("FORBIDDEN");
+    },
+  );
+
+  it("needs all three keys for a real platform (ADR 0005)", () => {
+    expect(evaluatePublishGates(liveYoutube).ok).toBe(true);
+    const channelOff = evaluatePublishGates({ ...liveYoutube, liveUploadsEnabled: false });
+    expect(!channelOff.ok && channelOff.error.code).toBe("FORBIDDEN");
+    const noCredential = evaluatePublishGates({ ...liveYoutube, credentialActive: false });
+    expect(!noCredential.ok && noCredential.error.code).toBe("CREDENTIAL_EXPIRED");
+  });
+
+  it("never calls a platform for a manual channel", () => {
+    const manual = evaluatePublishGates({ ...liveYoutube, channelMode: "manual" });
+    expect(!manual.ok && manual.error.code).toBe("FORBIDDEN");
+    const simulatedManual = evaluatePublishGates({ ...openGates, channelMode: "manual" });
+    expect(!simulatedManual.ok && simulatedManual.error.code).toBe("FORBIDDEN");
+  });
+
+  it("pauses win over everything, even in live mode", () => {
+    const paused = evaluatePublishGates({ ...liveYoutube, channelPaused: true });
+    expect(!paused.ok && paused.error.code).toBe("CHANNEL_PAUSED");
   });
 });
 

@@ -123,7 +123,7 @@ describe("idempotency key", () => {
 describe("processPublication against Postgres", () => {
   const run = (id: string, adapter: SimulatedPublisher, attempt: number, maxAttempts = 4) =>
     processPublication(
-      { store, publisher: adapter, logger },
+      { store, publishers: { simulated: adapter }, publishingMode: "simulated", logger },
       { publicationId: id, attempt, maxAttempts },
     );
 
@@ -278,7 +278,11 @@ describe("end to end through pg-boss", () => {
 
     const attempts: number[] = [];
     const handler = createPublishHandler(
-      { store, publisher: publisher(["timeout_after_accept"]) },
+      {
+        store,
+        publishers: { simulated: publisher(["timeout_after_accept"]) },
+        publishingMode: "simulated",
+      },
       definition,
     );
     await queue.work(

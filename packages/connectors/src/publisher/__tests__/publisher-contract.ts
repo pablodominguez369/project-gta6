@@ -2,7 +2,11 @@ import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import type { PublisherAdapter, PublishRequest } from "../publisher-adapter";
+import {
+  memoryPublishContext,
+  type PublisherAdapter,
+  type PublishRequest,
+} from "../publisher-adapter";
 
 const ALLOWED_ERROR_CODES = new Set([
   "RATE_LIMITED",
@@ -23,6 +27,7 @@ export function sampleRequest(overrides: Partial<PublishRequest> = {}): PublishR
     mediaRef: "renders/contract-test.mp4",
     syntheticMedia: false,
     scheduledAt: null,
+    visibility: "private",
     ...overrides,
   };
 }
@@ -38,6 +43,7 @@ export function runPublisherContract(name: string, factory: () => PublisherAdapt
       const { capabilities } = factory();
       expect(typeof capabilities.directPublish).toBe("boolean");
       expect(typeof capabilities.reconcileByRequest).toBe("boolean");
+      expect(typeof capabilities.privateVisibility).toBe("boolean");
       expect(Array.isArray(capabilities.docsUrls)).toBe(true);
     });
 
@@ -75,8 +81,9 @@ export function runPublisherContract(name: string, factory: () => PublisherAdapt
       const adapter = factory();
       if (!adapter.capabilities.reconcileByRequest) return;
       const request = sampleRequest();
-      const published = await adapter.publish(request);
-      const reconciled = await adapter.reconcile(request);
+      const context = memoryPublishContext();
+      const published = await adapter.publish(request, context);
+      const reconciled = await adapter.reconcile(request, context.current());
 
       expect(published.ok && reconciled.ok).toBe(true);
       if (published.ok && reconciled.ok) {

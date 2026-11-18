@@ -70,10 +70,28 @@ describe("loadEnv", () => {
     }
   });
 
-  it("rejects any publishing mode other than simulated", () => {
+  it("rejects live publishing in local development", () => {
     const result = loadEnv(workerEnvSchema, { ...validWorkerEnv, PUBLISHING_MODE: "live" });
 
     expect(!result.ok && result.error.message).toContain("PUBLISHING_MODE");
+  });
+
+  it("rejects unknown publishing modes", () => {
+    const result = loadEnv(workerEnvSchema, { ...validWorkerEnv, PUBLISHING_MODE: "public" });
+
+    expect(!result.ok && result.error.message).toContain("PUBLISHING_MODE");
+  });
+
+  it("defaults to simulated and accepts live outside local", () => {
+    const { PUBLISHING_MODE: _omit, ...withoutMode } = validWorkerEnv;
+    const simulated = loadEnv(workerEnvSchema, withoutMode);
+    expect(simulated.ok && simulated.value.PUBLISHING_MODE).toBe("simulated");
+    const live = loadEnv(workerEnvSchema, {
+      ...validWorkerEnv,
+      APP_ENV: "staging",
+      PUBLISHING_MODE: "live",
+    });
+    expect(live.ok && live.value.PUBLISHING_MODE).toBe("live");
   });
 
   it("rejects an invalid public Supabase URL", () => {

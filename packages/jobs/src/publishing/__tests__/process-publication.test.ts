@@ -1,8 +1,17 @@
 import {
   InMemorySimulatedRemoteStore,
+  SIMULATED_CAPABILITIES,
   SimulatedPublisher,
+  type ExternalPublication,
+  type PlatformCheckpoint,
+  type PublishContext,
+  type PublisherAdapter,
+  type PublisherCapabilities,
+  type PublishRequest,
+  type ReconcileResult,
   type SimulatedFault,
 } from "@gta6/connectors";
+import { DomainError, err, ok, type Result } from "@gta6/domain";
 import { createLogger } from "@gta6/observability";
 import { describe, expect, it } from "vitest";
 
@@ -27,7 +36,13 @@ function setup(faults: { publish?: SimulatedFault[]; reconcile?: SimulatedFault[
   });
   const run = (attempt: number, maxAttempts = 4): Promise<PublicationOutcome> =>
     processPublication(
-      { store, publisher, logger, now: () => NOW },
+      {
+        store,
+        publishers: { simulated: publisher },
+        publishingMode: "simulated",
+        logger,
+        now: () => NOW,
+      },
       { publicationId: store.id, attempt, maxAttempts },
     );
   return { store, remote, run };
@@ -213,3 +228,133 @@ function cleanMedia(): NonNullable<MemoryPublicationStore["media"]> {
     },
   };
 }
+
+/** A real-platform stand-in that loses the response after saving a checkpoint. */
+class CheckpointingFakeAdapter implements PublisherAdapter {
+  readonly platform = "youtube" as const;
+  readonly capabilities: PublisherCapabilities;
+  readonly uploads: string[] = [];
+  reconciledWith: PlatformCheckpoint | null | undefined;
+  private loseNextResponse: boolean;
+
+  constructor(options: { privateVisibility?: boolean; loseFirstResponse?: boolean } = {}) {
+    this.capabilities = {
+      ...SIMULATED_CAPABILITIES,
+      privateVisibility: options.privateVisibility ?? true,
+    };
+    this.loseNextResponse = options.loseFirstResponse ?? false;
+  }
+
+  validate(request: PublishRequest): Result<PublishRequest, DomainError> {
+    return ok(request);
+  }
+
+  async publish(
+    request: PublishRequest,
+    context?: PublishContext,
+  ): Promise<Result<ExternalPublication, DomainError>> {
+    await context?.saveCheckpoint({ uploadId: `up-${request.idempotencyKey}` });
+    this.uploads.push(request.idempotencyKey);
+    if (this.loseNextResponse) {
+      this.loseNextResponse = false;
+      return err(new DomainError("AMBIGUOUS_EXTERNAL_STATE", "lost"));
+    }
+    return ok({ externalId: "yt_1", permalink: null, status: "processing" });
+  }
+
+  reconcile(
+    _request: PublishRequest,
+    checkpoint?: PlatformCheckpoint | null,
+  ): Promise<Result<ReconcileResult, DomainError>> {
+    this.reconciledWith = checkpoint;
+    return Promise.resolve(
+      ok(
+        checkpoint
+          ? {
+              found: true,
+              publication: { externalId: "yt_1", permalink: null, status: "processing" },
+            }
+          : { found: false },
+      ),
+    );
+  }
+
+  getStatus(): Promise<Result<ExternalPublication, DomainError>> {
+    return Promise.resolve(err(new DomainError("NOT_FOUND", "unknown")));
+  }
+}
+
+describe("processPublication on real platforms (ADR 0005)", () => {
+  function liveSetup(
+    adapter: CheckpointingFakeAdapter,
+    publishingMode: "simulated" | "live" = "live",
+  ) {
+    const store = new MemoryPublicationStore();
+    store.platform = "youtube";
+    store.liveUploadsEnabled = true;
+    store.credentialActive = true;
+    store.media = cleanMedia();
+    store.payload = {
+      title: "Título",
+      description: "",
+      mediaRef: "renders/x/master.mp4",
+      syntheticMedia: true,
+    };
+    const run = (attempt: number) =>
+      processPublication(
+        { store, publishers: { youtube: adapter }, publishingMode, logger, now: () => NOW },
+        { publicationId: store.id, attempt, maxAttempts: 4 },
+      );
+    return { store, run };
+  }
+
+  it("never calls a real adapter while the worker is simulated", async () => {
+    const adapter = new CheckpointingFakeAdapter();
+    const { store, run } = liveSetup(adapter, "simulated");
+    expect(await run(1)).toEqual({ kind: "failed", code: "FORBIDDEN" });
+    expect(adapter.uploads).toEqual([]);
+    expect(store.row.status).toBe("failed");
+  });
+
+  it("refuses without the channel switch or an active credential", async () => {
+    const off = new CheckpointingFakeAdapter();
+    const offSetup = liveSetup(off);
+    offSetup.store.liveUploadsEnabled = false;
+    expect(await offSetup.run(1)).toEqual({ kind: "failed", code: "FORBIDDEN" });
+
+    const noCredential = new CheckpointingFakeAdapter();
+    const noCredentialSetup = liveSetup(noCredential);
+    noCredentialSetup.store.credentialActive = false;
+    expect(await noCredentialSetup.run(1)).toEqual({ kind: "failed", code: "CREDENTIAL_EXPIRED" });
+    expect([...off.uploads, ...noCredential.uploads]).toEqual([]);
+  });
+
+  it("refuses a platform without an adapter", async () => {
+    const { store } = liveSetup(new CheckpointingFakeAdapter());
+    store.platform = "tiktok";
+    const outcome = await processPublication(
+      { store, publishers: {}, publishingMode: "live", logger, now: () => NOW },
+      { publicationId: store.id, attempt: 1, maxAttempts: 4 },
+    );
+    expect(outcome).toEqual({ kind: "failed", code: "FORBIDDEN" });
+    expect(store.audit.map((event) => event.action)).toEqual(["publications.platform_refused"]);
+  });
+
+  it("refuses an adapter that cannot upload privately (no public posts in Phase 4)", async () => {
+    const adapter = new CheckpointingFakeAdapter({ privateVisibility: false });
+    const { run } = liveSetup(adapter);
+    expect(await run(1)).toEqual({ kind: "failed", code: "FORBIDDEN" });
+    expect(adapter.uploads).toEqual([]);
+  });
+
+  it("saves the checkpoint and reconciles with it after a lost response", async () => {
+    const adapter = new CheckpointingFakeAdapter({ loseFirstResponse: true });
+    const { store, run } = liveSetup(adapter);
+    expect((await run(1)).kind).toBe("retry");
+    expect(store.checkpoint).toEqual({ uploadId: `up-key-${store.id}` });
+
+    expect(await run(2)).toEqual({ kind: "succeeded", via: "reconcile" });
+    expect(adapter.reconciledWith).toEqual({ uploadId: `up-key-${store.id}` });
+    expect(adapter.uploads).toHaveLength(1);
+  });
+});

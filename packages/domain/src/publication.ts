@@ -54,16 +54,28 @@ export function mayHaveReachedPlatform(status: PublicationStatus): boolean {
   return status === "in_progress" || status === "ambiguous";
 }
 
+export const PUBLISHING_MODES = ["simulated", "live"] as const;
+export type PublishingMode = (typeof PUBLISHING_MODES)[number];
+
 export interface GateInput {
   readonly systemPaused: boolean;
   readonly channelPaused: boolean;
   readonly platform: string;
-  readonly publishingMode: "simulated";
+  /** Worker setting. "live" is only accepted outside local development (config). */
+  readonly publishingMode: PublishingMode;
+  /** Channel switch set by an admin with a reason (ADR 0005). */
+  readonly liveUploadsEnabled: boolean;
+  /** Channel mode; manual channels never call a platform. */
+  readonly channelMode: string;
+  /** The channel has an active, unexpired credential reference. */
+  readonly credentialActive: boolean;
 }
 
 /**
  * Pre-publication gates, checked on every attempt (not only when enqueuing), so a pause applied
- * after a job was queued still stops it.
+ * after a job was queued still stops it. A real platform needs three keys (ADR 0005): the
+ * worker in live mode, the channel switch and an active credential. Visibility is enforced
+ * separately: Phase 4 only uploads as private.
  */
 export function evaluatePublishGates(input: GateInput): Result<true, DomainError> {
   if (input.systemPaused) {
@@ -72,9 +84,19 @@ export function evaluatePublishGates(input: GateInput): Result<true, DomainError
   if (input.channelPaused) {
     return err(new DomainError("CHANNEL_PAUSED", "Channel is paused"));
   }
-  if (input.platform !== "simulated") {
-    // Phase 1: no real platform connector exists or is allowed (rule 1).
-    return err(new DomainError("FORBIDDEN", "Real platform publishing is disabled in Phase 1"));
+  if (input.channelMode === "manual") {
+    return err(new DomainError("FORBIDDEN", "Manual channels are published by hand"));
+  }
+  if (input.platform === "simulated") return ok(true);
+  if (input.publishingMode !== "live") {
+    // Development and CI never reach a real platform (rule 1).
+    return err(new DomainError("FORBIDDEN", "Real uploads are disabled in this worker"));
+  }
+  if (!input.liveUploadsEnabled) {
+    return err(new DomainError("FORBIDDEN", "Real uploads are not enabled for this channel"));
+  }
+  if (!input.credentialActive) {
+    return err(new DomainError("CREDENTIAL_EXPIRED", "The channel has no active credential"));
   }
   return ok(true);
 }

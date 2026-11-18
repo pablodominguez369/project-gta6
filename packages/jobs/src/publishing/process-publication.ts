@@ -1,4 +1,4 @@
-import type { PublisherAdapter, PublishRequest } from "@gta6/connectors";
+import type { PublisherAdapter, PublishContext, PublishRequest } from "@gta6/connectors";
 import {
   checkFrequency,
   DomainError,
@@ -7,6 +7,8 @@ import {
   isTerminal,
   publicationPayloadSchema,
   type ErrorCode,
+  type Platform,
+  type PublishingMode,
 } from "@gta6/domain";
 import type { Logger } from "@gta6/observability";
 
@@ -14,8 +16,10 @@ import type { PublicationContext, PublicationStore } from "./publication-store";
 
 export interface ProcessPublicationDeps {
   readonly store: PublicationStore;
-  /** Phase 1: always the SimulatedPublisher (the gates refuse any other platform). */
-  readonly publisher: PublisherAdapter;
+  /** One adapter per platform. A platform without an adapter is refused (FORBIDDEN). */
+  readonly publishers: Partial<Record<Platform, PublisherAdapter>>;
+  /** Worker setting; real platforms are refused unless "live" (ADR 0005). */
+  readonly publishingMode: PublishingMode;
   readonly logger: Logger;
   readonly now?: () => Date;
 }
@@ -79,7 +83,7 @@ async function attempt(
   deps: ProcessPublicationDeps,
   input: ProcessPublicationInput,
 ): Promise<PublicationOutcome> {
-  const { store, publisher, logger } = deps;
+  const { store, logger } = deps;
   const now = deps.now ?? (() => new Date());
   const id = input.publicationId;
   const finalAttempt = input.attempt >= input.maxAttempts;
@@ -92,16 +96,35 @@ async function attempt(
     systemPaused: context.systemPaused,
     channelPaused: context.channel.paused,
     platform: context.channel.platform,
-    publishingMode: "simulated",
+    publishingMode: deps.publishingMode,
+    liveUploadsEnabled: context.channel.liveUploadsEnabled,
+    channelMode: context.channel.mode,
+    credentialActive: context.channel.credentialActive,
   });
   if (!gates.ok) {
     const code = gates.error.code;
-    if (code === "FORBIDDEN") {
+    // Not a pause: an operator must act (enable the channel, reconnect the account).
+    if (code === "FORBIDDEN" || code === "CREDENTIAL_EXPIRED") {
       await store.update(id, { status: "failed", errorCode: code });
       return { kind: "failed", code };
     }
     await block(store, id, code, now());
     return { kind: "blocked", code };
+  }
+
+  const publisher = deps.publishers[context.channel.platform];
+  // Phase 4 only uploads privately; an adapter that cannot (Instagram) is never called.
+  if (
+    publisher?.platform !== context.channel.platform ||
+    !publisher.capabilities.privateVisibility
+  ) {
+    await store.update(id, { status: "failed", errorCode: "FORBIDDEN" });
+    await store.recordAudit({
+      action: "publications.platform_refused",
+      publicationId: id,
+      details: { platform: context.channel.platform, hasAdapter: publisher !== undefined },
+    });
+    return { kind: "failed", code: "FORBIDDEN" };
   }
 
   const request = buildRequest(context);
@@ -110,10 +133,21 @@ async function attempt(
     return { kind: "failed", code: "VALIDATION_FAILED" };
   }
 
+  let checkpoint = context.publication.platformCheckpoint;
+  const publishContext: PublishContext = {
+    get checkpoint() {
+      return checkpoint;
+    },
+    async saveCheckpoint(next) {
+      await store.saveCheckpoint(id, next);
+      checkpoint = next;
+    },
+  };
+
   await store.update(id, { status: "in_progress" });
 
   if (context.publication.reconcileRequired) {
-    const reconciled = await publisher.reconcile(request);
+    const reconciled = await publisher.reconcile(request, checkpoint);
     if (!reconciled.ok) {
       logger.warn({ errorCode: reconciled.error.code }, "reconciliation failed");
       return ambiguous(deps, id, "AMBIGUOUS_EXTERNAL_STATE", finalAttempt, "reconcile_failed");
@@ -164,7 +198,7 @@ async function attempt(
 
   // Committed BEFORE the call: if the process dies mid-request, the next attempt reconciles.
   await store.update(id, { status: "in_progress", reconcileRequired: true });
-  const published = await publisher.publish(request);
+  const published = await publisher.publish(request, publishContext);
 
   if (published.ok) {
     await store.markSucceeded(id, published.value, now());
@@ -200,6 +234,7 @@ function buildRequest(context: PublicationContext): PublishRequest | null {
     syntheticMedia: payload.data.syntheticMedia,
     // The dispatcher only enqueues once scheduled_at has passed, so the post goes out now.
     scheduledAt: null,
+    visibility: "private",
   };
 }
 

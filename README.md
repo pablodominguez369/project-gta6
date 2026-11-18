@@ -55,7 +55,9 @@ Auth: `proxy.ts` refreshes the Supabase session on every request and sends anony
 ## Worker (apps/worker)
 
 Long-running Node process (never on Vercel) that consumes pg-boss queues from the same Postgres.
-It refuses to start unless `PUBLISHING_MODE=simulated`. It also runs the publication dispatcher
+`PUBLISHING_MODE` defaults to `simulated`; `live` is refused when `APP_ENV=local` and only lets
+channels an admin switched on upload privately (see
+[ADR 0005](docs/adr/0005-live-publishing-gates.md)). It also runs the publication dispatcher
 (every 5 s) and the idempotent simulated publisher; see the flow in
 [docs/architecture.md](docs/architecture.md#publication-flow-t10).
 
