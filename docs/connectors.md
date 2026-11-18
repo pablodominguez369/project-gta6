@@ -121,6 +121,22 @@ in-memory fake of the Content Posting API.
   adapter refuses requests without `visibilityConfirmed`. Still pending before any TikTok audit
   (Phase 6): showing the creator's nickname and a preview in the panel before posting.
 
+## Instagram adapter (T34)
+
+`InstagramPublisher` (`packages/connectors/src/publisher/instagram`), contract-tested against an
+in-memory fake of the Graph API (Instagram Login). **Not registered in the worker**: Instagram
+has no private visibility, so `privateVisibility=false` and the orchestrator refuses it, and the
+adapter itself refuses every post unless `publicPostsAuthorized` is set (only tests do).
+
+- Reel container with `video_url` = a signed Storage URL created at that moment (never stored),
+  status polling (once a minute, up to 5 times), then `media_publish`.
+- Checkpoint: the container id. Reconciliation: `status_code=PUBLISHED` = the Reel exists
+  (matched by caption among recent media for the permalink); anything else = not published (an
+  unpublished container expires after 24 h).
+- `graphVersion` has no default: set it from Meta's changelog when enabling, after re-checking.
+- Before enabling (Phase 6): an Instagram Login OAuth provider, the owner's written authorization
+  for public posts, Meta app review for `instagram_business_content_publish`.
+
 ## Text to speech (Phase 3, T22)
 
 `TtsProvider.synthesize({ text, locale, providerVoiceId })` returns encoded audio (WAV or MP3),
