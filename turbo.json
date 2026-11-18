@@ -3,7 +3,16 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "env": [
+        "APP_ENV",
+        "LOG_LEVEL",
+        "NEXT_PUBLIC_*",
+        "SUPABASE_SECRET_KEY",
+        "APP_BASE_URL",
+        "YOUTUBE_OAUTH_*",
+        "TIKTOK_OAUTH_*"
+      ]
     },
     "lint": {},
     "typecheck": {},
