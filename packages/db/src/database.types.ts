@@ -175,6 +175,8 @@ export type Database = {
           created_by: string | null;
           display_name: string;
           id: string;
+          live_uploads_enabled: boolean;
+          live_uploads_reason: string | null;
           max_posts_per_day: number;
           min_minutes_between_posts: number;
           mode: Database["public"]["Enums"]["channel_mode"];
@@ -183,6 +185,7 @@ export type Database = {
           platform: Database["public"]["Enums"]["platform"];
           timezone: string;
           updated_at: string;
+          upload_visibility: Database["public"]["Enums"]["upload_visibility"];
         };
         ComputedFields: never;
         Insert: {
@@ -190,6 +193,8 @@ export type Database = {
           created_by?: string | null;
           display_name: string;
           id?: string;
+          live_uploads_enabled?: boolean;
+          live_uploads_reason?: string | null;
           max_posts_per_day?: number;
           min_minutes_between_posts?: number;
           mode?: Database["public"]["Enums"]["channel_mode"];
@@ -198,12 +203,15 @@ export type Database = {
           platform: Database["public"]["Enums"]["platform"];
           timezone?: string;
           updated_at?: string;
+          upload_visibility?: Database["public"]["Enums"]["upload_visibility"];
         };
         Update: {
           created_at?: string;
           created_by?: string | null;
           display_name?: string;
           id?: string;
+          live_uploads_enabled?: boolean;
+          live_uploads_reason?: string | null;
           max_posts_per_day?: number;
           min_minutes_between_posts?: number;
           mode?: Database["public"]["Enums"]["channel_mode"];
@@ -212,6 +220,7 @@ export type Database = {
           platform?: Database["public"]["Enums"]["platform"];
           timezone?: string;
           updated_at?: string;
+          upload_visibility?: Database["public"]["Enums"]["upload_visibility"];
         };
         Relationships: [];
       };
@@ -735,6 +744,7 @@ export type Database = {
           next_attempt_at: string | null;
           payload_json: NonNullable<Json>;
           permalink: string | null;
+          platform_checkpoint: Json | null;
           published_at: string | null;
           reconcile_required: boolean;
           render_id: string | null;
@@ -754,6 +764,7 @@ export type Database = {
           next_attempt_at?: string | null;
           payload_json?: NonNullable<Json>;
           permalink?: string | null;
+          platform_checkpoint?: Json | null;
           published_at?: string | null;
           reconcile_required?: boolean;
           render_id?: string | null;
@@ -772,6 +783,7 @@ export type Database = {
           next_attempt_at?: string | null;
           payload_json?: NonNullable<Json>;
           permalink?: string | null;
+          platform_checkpoint?: Json | null;
           published_at?: string | null;
           reconcile_required?: boolean;
           render_id?: string | null;
@@ -1297,6 +1309,7 @@ export type Database = {
       script_request_status: "queued" | "running" | "succeeded" | "blocked" | "failed";
       script_status: "draft" | "in_review" | "changes_requested" | "approved" | "rejected";
       source_type: "official" | "press" | "community" | "social";
+      upload_visibility: "private" | "public";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -1436,6 +1449,7 @@ export const Constants = {
       script_request_status: ["queued", "running", "succeeded", "blocked", "failed"],
       script_status: ["draft", "in_review", "changes_requested", "approved", "rejected"],
       source_type: ["official", "press", "community", "social"],
+      upload_visibility: ["private", "public"],
     },
   },
 } as const;

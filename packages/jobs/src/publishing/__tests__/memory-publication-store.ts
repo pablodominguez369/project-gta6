@@ -1,4 +1,4 @@
-import type { ExternalPublication } from "@gta6/connectors";
+import type { ExternalPublication, PlatformCheckpoint } from "@gta6/connectors";
 import type { PublicationStatus } from "@gta6/domain";
 
 import type {
@@ -32,6 +32,10 @@ export class MemoryPublicationStore implements PublicationStore {
   systemPaused = false;
   channelPaused = false;
   platform: PublicationContext["channel"]["platform"] = "simulated";
+  mode: PublicationContext["channel"]["mode"] = "draft";
+  liveUploadsEnabled = false;
+  credentialActive = false;
+  checkpoint: PlatformCheckpoint | null = null;
   payload: unknown = { title: "Título", description: "", mediaRef: "simulated://media/1" };
   recentPublishedAt: Date[] = [];
   media: PublicationContext["media"] = null;
@@ -66,10 +70,14 @@ export class MemoryPublicationStore implements PublicationStore {
         idempotencyKey: `key-${this.id}`,
         payload: this.payload,
         reconcileRequired: this.row.reconcileRequired,
+        platformCheckpoint: this.checkpoint,
       },
       channel: {
         platform: this.platform,
+        mode: this.mode,
         paused: this.channelPaused,
+        liveUploadsEnabled: this.liveUploadsEnabled,
+        credentialActive: this.credentialActive,
         timezone: "Europe/Madrid",
         maxPostsPerDay: 5,
         minMinutesBetweenPosts: 0,
@@ -101,6 +109,11 @@ export class MemoryPublicationStore implements PublicationStore {
 
   recordAudit(event: WorkerAuditEvent): Promise<void> {
     this.audit.push(event);
+    return Promise.resolve();
+  }
+
+  saveCheckpoint(_publicationId: string, checkpoint: PlatformCheckpoint): Promise<void> {
+    this.checkpoint = checkpoint;
     return Promise.resolve();
   }
 }

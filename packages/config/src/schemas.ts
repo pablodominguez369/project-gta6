@@ -30,9 +30,10 @@ export const webServerEnvSchema = baseEnvSchema.extend(publicEnvSchema.shape).ex
 });
 
 /**
- * Worker variables. In Phase 1 only the simulated publisher exists, so any other publishing
- * mode is rejected and the worker refuses to start.
+ * Worker variables. `PUBLISHING_MODE=live` lets channels that an admin switched on upload
+ * privately to real platforms (ADR 0005); it is refused in local development (rule 1).
  */
+export const PUBLISHING_MODES = ["simulated", "live"] as const;
 export const LLM_PROVIDERS = ["disabled", "fake", "anthropic"] as const;
 /** No real TTS adapter yet: the owner has not chosen a provider (see docs/connectors.md). */
 export const TTS_PROVIDERS = ["disabled", "fake"] as const;
@@ -42,7 +43,7 @@ export const workerEnvSchema = baseEnvSchema
     SUPABASE_URL: z.url(),
     SUPABASE_SECRET_KEY: supabaseSecretKey,
     DATABASE_URL: z.url().refine((value) => /^postgres(ql)?:\/\//.test(value)),
-    PUBLISHING_MODE: z.literal("simulated"),
+    PUBLISHING_MODE: z.enum(PUBLISHING_MODES).default("simulated"),
     /**
      * LLM used to draft scripts. "disabled" (default): no call leaves the worker. "fake": canned
      * answers, local only. "anthropic": real calls, still blocked while the spend limits are 0.
@@ -84,6 +85,13 @@ export const workerEnvSchema = baseEnvSchema
         code: "custom",
         path: ["LLM_PROVIDER"],
         message: "the fake LLM is only allowed when APP_ENV=local",
+      });
+    }
+    if (env.PUBLISHING_MODE === "live" && env.APP_ENV === "local") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["PUBLISHING_MODE"],
+        message: "live publishing is not allowed when APP_ENV=local (use simulated)",
       });
     }
     if (env.TTS_PROVIDER === "fake" && env.APP_ENV !== "local") {

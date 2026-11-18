@@ -10,6 +10,8 @@ export interface PublisherCapabilities {
   readonly scheduledPublish: boolean;
   /** Can find a previous upload of the same request (needed to reconcile ambiguous results). */
   readonly reconcileByRequest: boolean;
+  /** Can upload without making the post public (YouTube private, TikTok SELF_ONLY). */
+  readonly privateVisibility: boolean;
   /** ISO date when the capabilities were last checked against official docs; null = never. */
   readonly verifiedAgainstDocsAt: string | null;
   readonly docsUrls: readonly string[];
@@ -26,6 +28,8 @@ export const publishRequestSchema = z.object({
   /** The video contains synthetic media (AI voice); adapters set the platform's AI label. */
   syntheticMedia: z.boolean(),
   scheduledAt: z.iso.datetime().nullable(),
+  /** Phase 4 only uploads privately (ADR 0005); "public" does not exist in this schema. */
+  visibility: z.literal("private"),
 });
 
 export type PublishRequest = z.infer<typeof publishRequestSchema>;
@@ -40,6 +44,36 @@ export interface ExternalPublication {
 
 export type ReconcileResult =
   { readonly found: true; readonly publication: ExternalPublication } | { readonly found: false };
+
+/**
+ * Ids an adapter saves before a step whose outcome could be lost (an upload session, a publish
+ * id, a container id). Stored in `publications.platform_checkpoint`; never tokens or signed URLs.
+ */
+export type PlatformCheckpoint = Readonly<Record<string, string | number | boolean | null>>;
+
+export interface PublishContext {
+  /** Checkpoint saved by an earlier attempt of the same publication, if any. */
+  readonly checkpoint: PlatformCheckpoint | null;
+  /** Persists the checkpoint BEFORE the adapter continues (it must survive a crash). */
+  saveCheckpoint(checkpoint: PlatformCheckpoint): Promise<void>;
+}
+
+/** A context that keeps the checkpoint in memory, for the simulator and tests. */
+export function memoryPublishContext(
+  initial: PlatformCheckpoint | null = null,
+): PublishContext & { readonly current: () => PlatformCheckpoint | null } {
+  let checkpoint = initial;
+  return {
+    get checkpoint() {
+      return checkpoint;
+    },
+    current: () => checkpoint,
+    saveCheckpoint(next) {
+      checkpoint = next;
+      return Promise.resolve();
+    },
+  };
+}
 
 /**
  * Error codes an adapter may return. The orchestrator decides what to do with each:
@@ -68,8 +102,17 @@ export interface PublisherAdapter {
   readonly platform: Platform;
   readonly capabilities: PublisherCapabilities;
   validate(request: PublishRequest): Result<PublishRequest, DomainError>;
-  publish(request: PublishRequest): Promise<Result<ExternalPublication, DomainError>>;
-  /** Looks for an earlier upload of this request. Used after timeouts and before retries. */
-  reconcile(request: PublishRequest): Promise<Result<ReconcileResult, DomainError>>;
+  publish(
+    request: PublishRequest,
+    context?: PublishContext,
+  ): Promise<Result<ExternalPublication, DomainError>>;
+  /**
+   * Looks for an earlier upload of this request. Used after timeouts and before retries.
+   * `checkpoint` is what earlier attempts saved; adapters without an idempotency key use it.
+   */
+  reconcile(
+    request: PublishRequest,
+    checkpoint?: PlatformCheckpoint | null,
+  ): Promise<Result<ReconcileResult, DomainError>>;
   getStatus(externalId: string): Promise<Result<ExternalPublication, DomainError>>;
 }

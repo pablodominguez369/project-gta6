@@ -75,6 +75,7 @@ export const SIMULATED_CAPABILITIES: PublisherCapabilities = {
   directPublish: true,
   scheduledPublish: true,
   reconcileByRequest: true,
+  privateVisibility: true,
   // The simulator is ours: its behaviour is defined by this file, not by external docs.
   verifiedAgainstDocsAt: null,
   docsUrls: [],

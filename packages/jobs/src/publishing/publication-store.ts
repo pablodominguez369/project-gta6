@@ -1,6 +1,7 @@
-import type { ExternalPublication } from "@gta6/connectors";
+import type { ExternalPublication, PlatformCheckpoint } from "@gta6/connectors";
 import type {
   AssetOrigin,
+  ChannelMode,
   ErrorCode,
   Platform,
   PublicationMedia,
@@ -27,10 +28,16 @@ export interface PublicationContext {
     readonly idempotencyKey: string;
     readonly payload: unknown;
     readonly reconcileRequired: boolean;
+    /** Ids the adapter saved in an earlier attempt (ADR 0005); null when none. */
+    readonly platformCheckpoint: PlatformCheckpoint | null;
   };
   readonly channel: {
     readonly platform: Platform;
+    readonly mode: ChannelMode;
     readonly paused: boolean;
+    readonly liveUploadsEnabled: boolean;
+    /** An active credential reference that has not expired. */
+    readonly credentialActive: boolean;
     readonly timezone: string;
     readonly maxPostsPerDay: number;
     readonly minMinutesBetweenPosts: number;
@@ -78,6 +85,8 @@ export interface PublicationStore {
     publishedAt: Date,
   ): Promise<void>;
   recordAudit(event: WorkerAuditEvent): Promise<void>;
+  /** Persists the adapter checkpoint; committed before the adapter continues. */
+  saveCheckpoint(publicationId: string, checkpoint: PlatformCheckpoint): Promise<void>;
 }
 
 interface ContextRow {
@@ -87,8 +96,12 @@ interface ContextRow {
   idempotency_key: string;
   payload_json: unknown;
   reconcile_required: boolean;
+  platform_checkpoint: PlatformCheckpoint | null;
   platform: Platform;
+  mode: ChannelMode;
   paused: boolean;
+  live_uploads_enabled: boolean;
+  credential_active: boolean;
   timezone: string;
   max_posts_per_day: number;
   min_minutes_between_posts: number;
@@ -143,7 +156,12 @@ export class PgPublicationStore implements PublicationStore {
   async loadContext(publicationId: string): Promise<PublicationContext | null> {
     const { rows } = await this.pool.query<ContextRow>(
       `select p.id, p.channel_id, p.status, p.idempotency_key, p.payload_json, p.reconcile_required,
-              c.platform, c.paused, c.timezone, c.max_posts_per_day, c.min_minutes_between_posts,
+              p.platform_checkpoint, c.platform, c.mode, c.paused, c.live_uploads_enabled,
+              exists (select 1 from public.credential_refs cr
+                       where cr.channel_id = c.id and cr.status = 'active'
+                         and (cr.expires_at is null or cr.expires_at > now()))
+                as credential_active,
+              c.timezone, c.max_posts_per_day, c.min_minutes_between_posts,
               s.global_paused, p.render_id, r.qc_passed, r.disclosure_required,
               (select array_agg(src->>'assetId')
                  from jsonb_array_elements(coalesce(r.manifest->'sources', '[]'::jsonb)) src)
@@ -171,10 +189,14 @@ export class PgPublicationStore implements PublicationStore {
         idempotencyKey: row.idempotency_key,
         payload: row.payload_json,
         reconcileRequired: row.reconcile_required,
+        platformCheckpoint: row.platform_checkpoint,
       },
       channel: {
         platform: row.platform,
+        mode: row.mode,
         paused: row.paused,
+        liveUploadsEnabled: row.live_uploads_enabled,
+        credentialActive: row.credential_active,
         timezone: row.timezone,
         maxPostsPerDay: row.max_posts_per_day,
         minMinutesBetweenPosts: row.min_minutes_between_posts,
@@ -259,6 +281,14 @@ export class PgPublicationStore implements PublicationStore {
       `insert into public.audit_events (actor_type, action, object_type, object_id, safe_details)
        values ('worker', $1, 'publications', $2, $3)`,
       [event.action, event.publicationId, JSON.stringify(event.details)],
+    );
+  }
+
+  async saveCheckpoint(publicationId: string, checkpoint: PlatformCheckpoint): Promise<void> {
+    await this.pool.query(
+      `update public.publications set platform_checkpoint = $2
+        where id = $1 and ${NOT_TERMINAL}`,
+      [publicationId, JSON.stringify(checkpoint)],
     );
   }
 }

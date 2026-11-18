@@ -354,7 +354,10 @@ describe("publishing a render", () => {
     processPublication(
       {
         store: new PgPublicationStore(pool),
-        publisher: new SimulatedPublisher({ store: new PgSimulatedRemoteStore(pool) }),
+        publishers: {
+          simulated: new SimulatedPublisher({ store: new PgSimulatedRemoteStore(pool) }),
+        },
+        publishingMode: "simulated",
         logger,
       },
       { publicationId, attempt: 1, maxAttempts: 4 },

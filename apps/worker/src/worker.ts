@@ -66,7 +66,8 @@ export async function startWorker(source: NodeJS.ProcessEnv = process.env): Prom
 
   await queue.work(QUEUES.systemPing.name, trackJobRuns(db, logger, handleSystemPing));
 
-  // Phase 1: the only publisher is the simulator (PUBLISHING_MODE is validated as "simulated").
+  // Publishers by platform. Real adapters are added in Phase 4 tasks; until then real-platform
+  // channels are refused, and even in live mode the gates of ADR 0005 apply.
   const pool = new pg.Pool({ connectionString: env.DATABASE_URL, max: 5 });
   pool.on("error", (error) => {
     logger.error({ err: error }, "database pool error");
@@ -78,7 +79,11 @@ export async function startWorker(source: NodeJS.ProcessEnv = process.env): Prom
       db,
       logger,
       createPublishHandler(
-        { store: new PgPublicationStore(pool), publisher },
+        {
+          store: new PgPublicationStore(pool),
+          publishers: { simulated: publisher },
+          publishingMode: env.PUBLISHING_MODE,
+        },
         QUEUES.publishSimulated,
       ),
       {
