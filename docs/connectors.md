@@ -50,17 +50,17 @@ orchestrator (T10) avoids duplicates by reconciling before any retry.
 publishing the same request twice creates two posts, so tests can prove the orchestrator prevents
 duplicates.
 
-## Real platforms: capabilities pending verification
+## Real platforms (Phase 4)
 
-Nothing below is implemented. Every item must be checked against the current official
-documentation (scopes, app review/audit, quotas, eligibility, required UX) before an adapter is
-written, and recorded in the adapter's `capabilities.verifiedAgainstDocsAt` and `docsUrls`.
+Capabilities were checked against the official docs on 2026-11-18; see
+[platforms.md](platforms.md). The gates for real uploads are in
+[ADR 0005](adr/0005-live-publishing-gates.md): nothing is ever made public in Phase 4.
 
-| Platform        | What the spec expects (unverified)                                         | Manual fallback |
-| --------------- | -------------------------------------------------------------------------- | --------------- |
-| YouTube Shorts  | Data API v3 `videos.insert`, scope `youtube.upload`, `status.publishAt`    | Yes             |
-| Instagram Reels | Content Publishing (container + publish), permissions depend on login type | Yes             |
-| TikTok          | Content Posting API Direct Post, `video.publish`, audit for public posts   | Yes             |
+| Platform        | Upload path                                 | Phase 4 visibility   | Manual fallback |
+| --------------- | ------------------------------------------- | -------------------- | --------------- |
+| YouTube Shorts  | Data API v3 resumable `videos.insert`       | Private only         | Yes             |
+| TikTok          | Content Posting Direct Post, `FILE_UPLOAD`  | `SELF_ONLY` only     | Yes             |
+| Instagram Reels | Instagram Login container + `media_publish` | Blocked (no private) | Yes (only path) |
 
 ## Text to speech (Phase 3, T22)
 
