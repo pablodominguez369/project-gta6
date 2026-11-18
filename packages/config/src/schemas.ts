@@ -24,10 +24,32 @@ export const publicEnvSchema = z.object({
  */
 const supabaseSecretKey = z.string().min(20);
 
-/** Server-only variables for the Next.js app. Never import this from client code. */
-export const webServerEnvSchema = baseEnvSchema.extend(publicEnvSchema.shape).extend({
-  SUPABASE_SECRET_KEY: supabaseSecretKey,
+const secretRef = z
+  .string()
+  .regex(/^[a-z][a-z0-9+.-]*:\/\/[A-Za-z0-9._/-]+$/, "must be a secret reference like env://NAME");
+
+/**
+ * OAuth apps used to connect YouTube and TikTok accounts (T31). All optional: a platform whose
+ * client id or secret reference is missing simply cannot be connected. The secret is a reference
+ * (env:// locally, vault:// in staging/production), never the value itself.
+ */
+export const platformOAuthEnvSchema = z.object({
+  /** Public base URL of the panel; the OAuth redirect URI is APP_BASE_URL + the callback path. */
+  APP_BASE_URL: z.url().optional(),
+  YOUTUBE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
+  YOUTUBE_OAUTH_CLIENT_SECRET_REF: secretRef.optional(),
+  /** TikTok calls the client id "client key". */
+  TIKTOK_OAUTH_CLIENT_KEY: z.string().min(1).optional(),
+  TIKTOK_OAUTH_CLIENT_SECRET_REF: secretRef.optional(),
 });
+
+/** Server-only variables for the Next.js app. Never import this from client code. */
+export const webServerEnvSchema = baseEnvSchema
+  .extend(publicEnvSchema.shape)
+  .extend({
+    SUPABASE_SECRET_KEY: supabaseSecretKey,
+  })
+  .extend(platformOAuthEnvSchema.shape);
 
 /**
  * Worker variables. `PUBLISHING_MODE=live` lets channels that an admin switched on upload
@@ -39,6 +61,7 @@ export const LLM_PROVIDERS = ["disabled", "fake", "anthropic"] as const;
 export const TTS_PROVIDERS = ["disabled", "fake"] as const;
 
 export const workerEnvSchema = baseEnvSchema
+  .extend(platformOAuthEnvSchema.shape)
   .extend({
     SUPABASE_URL: z.url(),
     SUPABASE_SECRET_KEY: supabaseSecretKey,
@@ -107,3 +130,4 @@ export type BaseEnv = z.infer<typeof baseEnvSchema>;
 export type PublicEnv = z.infer<typeof publicEnvSchema>;
 export type WebServerEnv = z.infer<typeof webServerEnvSchema>;
 export type WorkerEnv = z.infer<typeof workerEnvSchema>;
+export type PlatformOAuthEnv = z.infer<typeof platformOAuthEnvSchema>;

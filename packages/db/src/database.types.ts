@@ -1286,6 +1286,23 @@ export type Database = {
       has_role: { Args: { required: Database["public"]["Enums"]["app_role"] }; Returns: boolean };
       is_member: { Args: Record<PropertyKey, never>; Returns: boolean };
       media_project_is_editable: { Args: { p_project_id: string }; Returns: boolean };
+      read_vault_secret: { Args: { secret_ref: string }; Returns: string };
+      revoke_channel_credentials: {
+        Args: { actor_id: string; channel_id: string };
+        Returns: undefined;
+      };
+      store_channel_credential: {
+        Args: {
+          actor_id: string;
+          channel_id: string;
+          expires_at?: string;
+          scopes: string[];
+          secret: string;
+        };
+        Returns: string;
+      };
+      update_vault_secret: { Args: { secret: string; secret_ref: string }; Returns: undefined };
+      vault_secret_id: { Args: { secret_ref: string }; Returns: string };
     };
     Enums: {
       app_role: "admin" | "editor" | "rights_reviewer" | "publisher" | "analyst" | "read_only";

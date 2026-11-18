@@ -62,6 +62,23 @@ Capabilities were checked against the official docs on 2026-11-18; see
 | TikTok          | Content Posting Direct Post, `FILE_UPLOAD`  | `SELF_ONLY` only     | Yes             |
 | Instagram Reels | Instagram Login container + `media_publish` | Blocked (no private) | Yes (only path) |
 
+## Connecting accounts (T31)
+
+- Admins connect a YouTube or TikTok channel from **Canales** ("Conectar cuenta"). The panel
+  sends them to the platform's consent screen with a random `state` kept in an httpOnly cookie
+  (10 minutes, callback path only); the callback checks it, exchanges the code on the server and
+  stores the token set in Supabase Vault with `store_channel_credential` (service role only).
+  `credential_refs` keeps `vault://<id>`, the scopes and the refresh-token expiry; older
+  credentials of the channel are revoked and their secrets deleted.
+- Scopes: YouTube `youtube.upload` + `youtube.readonly` (status of our own uploads); TikTok
+  `video.publish`. Instagram is not connected in Phase 4 (no private visibility).
+- The worker reads tokens with `PgChannelTokens`, refreshing them 10 minutes before expiry inside
+  the channel lock (TikTok rotates the refresh token on every refresh). A rejected refresh
+  (`invalid_grant`) marks the credential `expired` and publications fail with
+  `CREDENTIAL_EXPIRED` until an admin reconnects.
+- "Desconectar" revokes the credential, deletes the secret and switches real uploads off.
+- OAuth client secrets are references too (`*_CLIENT_SECRET_REF`), resolved at the moment of use.
+
 ## Text to speech (Phase 3, T22)
 
 `TtsProvider.synthesize({ text, locale, providerVoiceId })` returns encoded audio (WAV or MP3),
