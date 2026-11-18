@@ -174,6 +174,17 @@ The render worker runs the check before rendering, and the publisher runs it aga
 publishing, with fresh data, so a license that expires or an asset that gets disputed in
 between still blocks.
 
+### Rights screen (T21)
+
+`/admin/assets` ("Derechos"). Editors, rights reviewers and admins upload files: the server
+checks type and size and returns a one-time signed upload URL for a random `assets/<uuid>.<ext>`
+path, the browser uploads straight to the private `media` bucket (large files never pass through
+a Vercel function), then the server reads the stored size and type from Storage and registers
+the asset. The SHA-256 is computed in the browser; the render worker recomputes it before use and
+blocks the asset on a mismatch. Rights reviewers and admins record licenses and decide each
+asset's status; the page shows whether each asset can be used and why not. Files are opened
+through `/admin/assets/<id>/file`, which redirects to a 60-second signed URL.
+
 ## Decisions
 
 - [ADR 0001](adr/0001-monolith-nextjs-supabase.md): Next.js + Supabase modular monolith
