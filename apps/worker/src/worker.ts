@@ -1,11 +1,16 @@
 import {
+  CompositeSecretStore,
   createLlmProvider,
   DisabledLlmProvider,
   DisabledTtsProvider,
   EnvSecretStore,
   FakeTtsProvider,
+  loadOAuthProvider,
   SimulatedPublisher,
+  VaultSecretStore,
+  YouTubePublisher,
   type LlmProvider,
+  type SecretStore,
   type TtsProvider,
 } from "@gta6/connectors";
 import { createAdminClient } from "@gta6/db";
@@ -18,6 +23,7 @@ import {
   PgBossQueue,
   PgLlmUsageStore,
   SupabaseMediaStore,
+  PgChannelTokens,
   PgPublicationStore,
   PgSimulatedRemoteStore,
   mediaRenderPayloadSchema,
@@ -66,13 +72,30 @@ export async function startWorker(source: NodeJS.ProcessEnv = process.env): Prom
 
   await queue.work(QUEUES.systemPing.name, trackJobRuns(db, logger, handleSystemPing));
 
-  // Publishers by platform. Real adapters are added in Phase 4 tasks; until then real-platform
-  // channels are refused, and even in live mode the gates of ADR 0005 apply.
+  // Publishers by platform. Real adapters are only reached through the gates of ADR 0005:
+  // PUBLISHING_MODE=live, the channel switch and an active credential; uploads are private.
   const pool = new pg.Pool({ connectionString: env.DATABASE_URL, max: 5 });
   pool.on("error", (error) => {
     logger.error({ err: error }, "database pool error");
   });
   const publisher = new SimulatedPublisher({ store: new PgSimulatedRemoteStore(pool) });
+  const secrets = new CompositeSecretStore([
+    new EnvSecretStore(env.APP_ENV),
+    new VaultSecretStore(async (secretRef) => {
+      const { rows } = await pool.query<{ secret: string | null }>(
+        "select public.read_vault_secret($1) as secret",
+        [secretRef],
+      );
+      return rows[0]?.secret ?? null;
+    }),
+  ]);
+  const channelTokens = new PgChannelTokens(
+    pool,
+    (platform) => loadOAuthProvider(platform, env, secrets),
+    logger,
+  );
+  const renders = new SupabaseMediaStore(db);
+  const youtube = new YouTubePublisher({ tokens: channelTokens, media: renders });
   await queue.work(
     QUEUES.publishSimulated.name,
     trackJobRuns(
@@ -81,7 +104,7 @@ export async function startWorker(source: NodeJS.ProcessEnv = process.env): Prom
       createPublishHandler(
         {
           store: new PgPublicationStore(pool),
-          publishers: { simulated: publisher },
+          publishers: { simulated: publisher, youtube },
           publishingMode: env.PUBLISHING_MODE,
         },
         QUEUES.publishSimulated,
@@ -106,7 +129,7 @@ export async function startWorker(source: NodeJS.ProcessEnv = process.env): Prom
   const discoverySchedule = scheduleDiscoveryPoll(queue);
 
   // LLM drafting: off unless configured, and every call goes through the spend gate.
-  const provider = await buildLlmProvider(env, logger);
+  const provider = await buildLlmProvider(env, logger, secrets);
   await queue.work(
     QUEUES.scriptDraft.name,
     trackJobRuns(
@@ -167,10 +190,12 @@ export async function startWorker(source: NodeJS.ProcessEnv = process.env): Prom
 async function buildLlmProvider(
   env: ReturnType<typeof loadWorkerEnv>,
   logger: Logger,
+  secrets: SecretStore,
 ): Promise<LlmProvider> {
+  // env:// locally, vault:// in staging/production (the same store as platform secrets).
   const result = await createLlmProvider(
     { provider: env.LLM_PROVIDER, model: env.LLM_MODEL, apiKeyRef: env.LLM_API_KEY_REF },
-    new EnvSecretStore(env.APP_ENV),
+    secrets,
   );
   if (!result.ok) {
     logger.error({ errorCode: result.error.code }, "LLM provider unavailable; drafting disabled");

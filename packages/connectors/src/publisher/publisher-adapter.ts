@@ -114,5 +114,9 @@ export interface PublisherAdapter {
     request: PublishRequest,
     checkpoint?: PlatformCheckpoint | null,
   ): Promise<Result<ReconcileResult, DomainError>>;
-  getStatus(externalId: string): Promise<Result<ExternalPublication, DomainError>>;
+  /** `channelId` selects the account's credential on real platforms. */
+  getStatus(
+    externalId: string,
+    channelId?: string,
+  ): Promise<Result<ExternalPublication, DomainError>>;
 }

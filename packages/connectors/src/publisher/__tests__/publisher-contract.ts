@@ -101,17 +101,18 @@ export function runPublisherContract(name: string, factory: () => PublisherAdapt
 
     it("looks up status by external id and answers NOT_FOUND for unknown ids", async () => {
       const adapter = factory();
-      const published = await adapter.publish(sampleRequest());
+      const request = sampleRequest();
+      const published = await adapter.publish(request);
       if (!published.ok) throw new Error("publish failed");
 
-      const status = await adapter.getStatus(published.value.externalId);
-      const unknown = await adapter.getStatus("does-not-exist");
+      const status = await adapter.getStatus(published.value.externalId, request.channelId);
+      const unknown = await adapter.getStatus("does-not-exist", request.channelId);
       expect(status.ok && status.value.externalId).toBe(published.value.externalId);
       expect(!unknown.ok && unknown.error.code).toBe("NOT_FOUND");
     });
 
     it("only uses known error codes", async () => {
-      const result = await factory().getStatus("does-not-exist");
+      const result = await factory().getStatus("does-not-exist", sampleRequest().channelId);
       if (!result.ok) expect(ALLOWED_ERROR_CODES.has(result.error.code)).toBe(true);
     });
   });
