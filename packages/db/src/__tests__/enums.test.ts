@@ -3,6 +3,7 @@ import {
   ASSET_KINDS,
   ASSET_ORIGINS,
   CLAIM_CERTAINTIES,
+  MEDIA_PROJECT_STATUSES,
   OPPORTUNITY_STATUSES,
   PLATFORMS,
   PUBLICATION_STATUSES,
@@ -32,6 +33,7 @@ describe("domain enums match the database", () => {
     ["rights_status", RIGHTS_STATUSES, db.rights_status],
     ["asset_kind", ASSET_KINDS, db.asset_kind],
     ["asset_origin", ASSET_ORIGINS, db.asset_origin],
+    ["media_project_status", MEDIA_PROJECT_STATUSES, db.media_project_status],
   ] as const)("%s", (_name, domain, database) => {
     expect([...domain]).toEqual([...database]);
   });

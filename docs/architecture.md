@@ -185,6 +185,25 @@ blocks the asset on a mismatch. Rights reviewers and admins record licenses and 
 asset's status; the page shows whether each asset can be used and why not. Files are opened
 through `/admin/assets/<id>/file`, which redirects to a 60-second signed URL.
 
+### Video projects and storyboard (T23)
+
+An editor turns an approved script into a `media_project` (`/admin/media`, "Vídeos"): one voice,
+an optional music track, the own brand text, target platforms and a background per scene. The
+selects only offer assets and voices usable right now; the worker checks again before rendering.
+
+`packages/domain/src/storyboard.ts` is pure and shared by the preview and the worker:
+
+- `buildStoryboard` lays the lines end to end with the narration length of each line (the TTS
+  result in the worker, an estimate in the preview) plus its pause.
+- `buildCaptions` wraps each line within the safe area (1080x1920, text between y=250 and y=1500,
+  90 px side margins) in cues of at most two lines, timed by characters within the line's voice.
+- `findOverflowingText` flags headlines that would need more than three lines.
+- `buildAss` writes the subtitles file (captions, headline per scene, own brand and the
+  synthetic-voice disclosure) for FFmpeg/libass; ASS override braces in the text are removed.
+
+Clients only edit drafts and queue them (`guard_media_project`); `renders` are written by the
+worker only.
+
 ## Decisions
 
 - [ADR 0001](adr/0001-monolith-nextjs-supabase.md): Next.js + Supabase modular monolith
