@@ -1,4 +1,4 @@
-# Platform capabilities (verified for Phase 4)
+# Platform capabilities (verified for Phases 4 and 5)
 
 Checked against the official documentation on **2026-11-18**. Each adapter repeats the date and
 the URLs in `capabilities.verifiedAgainstDocsAt` / `docsUrls`. Re-check before enabling a channel
@@ -108,3 +108,58 @@ for any public post.
 The Phase 3 master (vertical 1080x1920 H.264/AAC MP4) fits all three, so no per-platform encode is
 added. Adapters validate duration and size and refuse with `VALIDATION_FAILED` (then the manual
 package is the fallback).
+
+## Analytics (Phase 5)
+
+Checked against the official documentation on **2026-11-18**. See
+[ADR 0006](adr/0006-analytics-with-uncertainty.md) for how the numbers are used.
+
+### YouTube
+
+Sources: [reports.query](https://developers.google.com/youtube/analytics/reference/reports/query),
+[metrics](https://developers.google.com/youtube/analytics/metrics),
+[authorization](https://developers.google.com/youtube/reporting/guides/authorization),
+[videos resource](https://developers.google.com/youtube/v3/docs/videos).
+
+- Counters: Data API `GET /youtube/v3/videos?part=statistics&id=...` (`viewCount`, `likeCount`,
+  `commentCount`) with `youtube.readonly`, already requested in Phase 4.
+- Report: `GET https://youtubeanalytics.googleapis.com/v2/reports` with `ids=channel==MINE`,
+  `startDate`/`endDate` (`YYYY-MM-DD`), `metrics=...` and `filters=video==VIDEO_ID`. The JSON
+  answer has `columnHeaders` and `rows`; `rows` is omitted when there is no data.
+- Metrics used: `views`, `likes`, `comments`, `shares`, `estimatedMinutesWatched`,
+  `averageViewDuration`, `averageViewPercentage`, `subscribersGained`.
+- Scopes: the reference lists `yt-analytics.readonly`; the authorization guide says
+  `youtube.readonly` also allows non-monetary reports. We request `yt-analytics.readonly`
+  explicitly and do not depend on the second statement.
+- The owner must enable the "YouTube Analytics API" in the Google Cloud project.
+- Caveats from the docs: "views" means different things in different reports; average duration
+  and percentage exclude looping clips since 2021-12-13. Data latency is not documented, so a
+  window is read again on the next run until it is complete (see below).
+
+### TikTok
+
+Sources: [video query](https://developers.tiktok.com/docs/en/tiktok-api-v2-video-query),
+[video object](https://developers.tiktok.com/docs/en/tiktok-api-v2-video-object),
+[scopes](https://developers.tiktok.com/docs/en/tiktok-api-scopes),
+[Display API get started](https://developers.tiktok.com/docs/en/display-api-get-started).
+
+- `POST https://open.tiktokapis.com/v2/video/query/?fields=id,view_count,like_count,comment_count,share_count`
+  with body `{"filters":{"video_ids":[...]}}`, up to 20 ids per request.
+- Scope `video.list`: "Read a user's public videos on TikTok". Needs Login Kit plus the TikTok API
+  product approved for `user.info.basic` and `video.list`.
+- **Only public videos**: a `SELF_ONLY` upload from Phase 4 is not expected to be returned, and
+  the adapter treats a missing video as "no data", never as zero.
+- No watch time, reach or retention through this API. Rate limits are not stated on the page.
+
+### Instagram
+
+Source: [media insights](https://developers.facebook.com/documentation/instagram-platform/reference/instagram-media/insights).
+
+- `GET graph.instagram.com/<MEDIA_ID>/insights`, permissions `instagram_business_basic` and
+  `instagram_business_manage_insights`.
+- Reels metrics: `views`, `reach`, `likes`, `comments`, `shares`, `saved`,
+  `total_interactions`, `ig_reels_avg_watch_time`, `ig_reels_video_view_total_time`,
+  `reels_skip_rate`, `reposts`. `impressions` is deprecated for media after 2024-07-02.
+- Data can be delayed up to 48 hours; an unavailable metric comes back as an empty set, not `0`;
+  data is kept for up to 2 years.
+- There is no Instagram connection in this project, so Instagram metrics are **entered by hand**.
