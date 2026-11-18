@@ -1,9 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { isPublicPath } from "../auth/public-paths";
 import { publicEnv } from "../public-env";
-
-const PUBLIC_PATHS = ["/login"];
 
 /**
  * Refreshes the Supabase session cookie on every request and redirects anonymous users to
@@ -42,7 +41,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   // and this call.
   const { data } = await supabase.auth.getClaims();
   const isAuthenticated = Boolean(data?.claims.sub);
-  const isPublic = PUBLIC_PATHS.some((path) => request.nextUrl.pathname.startsWith(path));
+  const isPublic = isPublicPath(request.nextUrl.pathname);
 
   if (!isAuthenticated && !isPublic) {
     const loginUrl = request.nextUrl.clone();
