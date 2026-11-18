@@ -1,9 +1,12 @@
 import {
   APP_ROLES,
+  ASSET_KINDS,
+  ASSET_ORIGINS,
   CLAIM_CERTAINTIES,
   OPPORTUNITY_STATUSES,
   PLATFORMS,
   PUBLICATION_STATUSES,
+  RIGHTS_STATUSES,
   SCRIPT_REQUEST_STATUSES,
   SCRIPT_STATUSES,
   SOURCE_TYPES,
@@ -26,6 +29,9 @@ describe("domain enums match the database", () => {
     ["opportunity_status", OPPORTUNITY_STATUSES, db.opportunity_status],
     ["script_status", SCRIPT_STATUSES, db.script_status],
     ["script_request_status", SCRIPT_REQUEST_STATUSES, db.script_request_status],
+    ["rights_status", RIGHTS_STATUSES, db.rights_status],
+    ["asset_kind", ASSET_KINDS, db.asset_kind],
+    ["asset_origin", ASSET_ORIGINS, db.asset_origin],
   ] as const)("%s", (_name, domain, database) => {
     expect([...domain]).toEqual([...database]);
   });

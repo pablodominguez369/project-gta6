@@ -54,6 +54,84 @@ export type Database = {
         };
         Relationships: [];
       };
+      assets: {
+        Row: {
+          attribution: string;
+          content_hash: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          kind: Database["public"]["Enums"]["asset_kind"];
+          license_id: string | null;
+          metadata: NonNullable<Json>;
+          mime_type: string;
+          origin: Database["public"]["Enums"]["asset_origin"];
+          owner: string;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
+          rights_note: string;
+          rights_status: Database["public"]["Enums"]["rights_status"];
+          size_bytes: number;
+          source_url: string | null;
+          storage_path: string;
+          title: string;
+          updated_at: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          attribution?: string;
+          content_hash: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          kind: Database["public"]["Enums"]["asset_kind"];
+          license_id?: string | null;
+          metadata?: NonNullable<Json>;
+          mime_type: string;
+          origin: Database["public"]["Enums"]["asset_origin"];
+          owner: string;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          rights_note?: string;
+          rights_status?: Database["public"]["Enums"]["rights_status"];
+          size_bytes: number;
+          source_url?: string | null;
+          storage_path: string;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          attribution?: string;
+          content_hash?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          kind?: Database["public"]["Enums"]["asset_kind"];
+          license_id?: string | null;
+          metadata?: NonNullable<Json>;
+          mime_type?: string;
+          origin?: Database["public"]["Enums"]["asset_origin"];
+          owner?: string;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          rights_note?: string;
+          rights_status?: Database["public"]["Enums"]["rights_status"];
+          size_bytes?: number;
+          source_url?: string | null;
+          storage_path?: string;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "assets_license_id_fkey";
+            columns: ["license_id"];
+            isOneToOne: false;
+            referencedRelation: "licenses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       audit_events: {
         Row: {
           action: string;
@@ -362,6 +440,61 @@ export type Database = {
           status?: Database["public"]["Enums"]["job_run_status"];
           target_id?: string | null;
           target_type?: string | null;
+        };
+        Relationships: [];
+      };
+      licenses: {
+        Row: {
+          allowed_platforms: Database["public"]["Enums"]["platform"][];
+          allowed_transformations: string;
+          commercial_allowed: boolean;
+          created_at: string;
+          created_by: string | null;
+          expires_at: string | null;
+          id: string;
+          licensor: string;
+          notes: string;
+          proof_path: string | null;
+          scope: string;
+          terms_url: string | null;
+          territory: string;
+          updated_at: string;
+          valid_from: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          allowed_platforms: Database["public"]["Enums"]["platform"][];
+          allowed_transformations?: string;
+          commercial_allowed?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+          expires_at?: string | null;
+          id?: string;
+          licensor: string;
+          notes?: string;
+          proof_path?: string | null;
+          scope: string;
+          terms_url?: string | null;
+          territory: string;
+          updated_at?: string;
+          valid_from?: string | null;
+        };
+        Update: {
+          allowed_platforms?: Database["public"]["Enums"]["platform"][];
+          allowed_transformations?: string;
+          commercial_allowed?: boolean;
+          created_at?: string;
+          created_by?: string | null;
+          expires_at?: string | null;
+          id?: string;
+          licensor?: string;
+          notes?: string;
+          proof_path?: string | null;
+          scope?: string;
+          terms_url?: string | null;
+          territory?: string;
+          updated_at?: string;
+          valid_from?: string | null;
         };
         Relationships: [];
       };
@@ -884,6 +1017,8 @@ export type Database = {
     Enums: {
       app_role: "admin" | "editor" | "rights_reviewer" | "publisher" | "analyst" | "read_only";
       approval_decision: "approved" | "changes_requested" | "rejected";
+      asset_kind: "image" | "video" | "audio" | "music" | "font" | "voice";
+      asset_origin: "original_work" | "ai_generated" | "own_capture" | "official" | "licensed";
       channel_mode: "draft" | "approval" | "autopublish" | "manual";
       claim_certainty: "confirmed" | "reported" | "rumor" | "speculation" | "opinion";
       credential_status: "pending" | "active" | "expired" | "revoked";
@@ -893,6 +1028,14 @@ export type Database = {
       platform: "youtube" | "instagram" | "tiktok" | "simulated";
       publication_status:
         "queued" | "in_progress" | "succeeded" | "failed" | "ambiguous" | "blocked";
+      rights_status:
+        | "original"
+        | "cleared"
+        | "requires_permission"
+        | "unknown"
+        | "restricted"
+        | "expired"
+        | "disputed";
       script_request_status: "queued" | "running" | "succeeded" | "blocked" | "failed";
       script_status: "draft" | "in_review" | "changes_requested" | "approved" | "rejected";
       source_type: "official" | "press" | "community" | "social";
@@ -1012,6 +1155,8 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "editor", "rights_reviewer", "publisher", "analyst", "read_only"],
       approval_decision: ["approved", "changes_requested", "rejected"],
+      asset_kind: ["image", "video", "audio", "music", "font", "voice"],
+      asset_origin: ["original_work", "ai_generated", "own_capture", "official", "licensed"],
       channel_mode: ["draft", "approval", "autopublish", "manual"],
       claim_certainty: ["confirmed", "reported", "rumor", "speculation", "opinion"],
       credential_status: ["pending", "active", "expired", "revoked"],
@@ -1020,6 +1165,15 @@ export const Constants = {
       opportunity_status: ["new", "shortlisted", "accepted", "discarded", "expired"],
       platform: ["youtube", "instagram", "tiktok", "simulated"],
       publication_status: ["queued", "in_progress", "succeeded", "failed", "ambiguous", "blocked"],
+      rights_status: [
+        "original",
+        "cleared",
+        "requires_permission",
+        "unknown",
+        "restricted",
+        "expired",
+        "disputed",
+      ],
       script_request_status: ["queued", "running", "succeeded", "blocked", "failed"],
       script_status: ["draft", "in_review", "changes_requested", "approved", "rejected"],
       source_type: ["official", "press", "community", "social"],

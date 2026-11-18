@@ -75,10 +75,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @gta6/web exec playwright install --with-deps chromium
 
-      - name: Start local Supabase (database, auth, REST only)
+      - name: Start local Supabase (database, auth, REST, storage)
         run: >-
           pnpm supabase start
-          -x realtime,studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit,postgres-meta,storage-api
+          -x realtime,studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit,postgres-meta
 
       # Local Supabase keys are per-run development defaults, written to an ignored file and
       # never echoed.
