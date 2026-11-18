@@ -16,3 +16,5 @@ export * from "./oauth/tiktok-oauth-provider";
 export * from "./oauth/create-oauth-provider";
 export * from "./secrets/vault-secret-store";
 export * from "./oauth/configured-providers";
+export * from "./publisher/platform-deps";
+export * from "./publisher/youtube/youtube-publisher";

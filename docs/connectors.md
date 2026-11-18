@@ -79,6 +79,27 @@ Capabilities were checked against the official docs on 2026-11-18; see
 - "Desconectar" revokes the credential, deletes the secret and switches real uploads off.
 - OAuth client secrets are references too (`*_CLIENT_SECRET_REF`), resolved at the moment of use.
 
+## YouTube adapter (T32)
+
+`YouTubePublisher` (`packages/connectors/src/publisher/youtube`). Contract-tested against an
+in-memory fake of the Data API; it never reaches the network in tests.
+
+- Uploads with `privacyStatus=private`, `selfDeclaredMadeForKids=false` (GTA content is not made
+  for children), `containsSyntheticMedia` from the render, category Gaming. `publishAt` is never
+  sent: it would make the private video public at that time.
+- Rejects titles or descriptions with `<` or `>`, descriptions over 5000 bytes and any
+  `scheduledAt` before calling YouTube.
+- Starts a resumable session, saves `{sessionUri, sizeBytes}` as checkpoint, then sends the file.
+  A lost answer is `AMBIGUOUS_EXTERNAL_STATE`; reconciliation asks the session
+  (`Content-Range: bytes */size`): `201` = the video exists, `308`/`404` = no video, anything else
+  = error (never "not found").
+- The checkpoint works as a capability for that upload, so members cannot read
+  `publications.platform_checkpoint` (column privileges) and it is cleared once the post exists.
+- `getStatus` uses `videos.list?part=status` (needs `youtube.readonly`).
+- Errors: 401 → `CREDENTIAL_EXPIRED`; `quotaExceeded`/`uploadLimitExceeded`/429 → `RATE_LIMITED`;
+  other 403 → `FORBIDDEN`; 400 → `VALIDATION_FAILED`; 5xx/network before the upload →
+  `EXTERNAL_UNAVAILABLE`.
+
 ## Text to speech (Phase 3, T22)
 
 `TtsProvider.synthesize({ text, locale, providerVoiceId })` returns encoded audio (WAV or MP3),

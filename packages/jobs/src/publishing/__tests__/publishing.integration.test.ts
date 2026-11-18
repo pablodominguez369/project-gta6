@@ -312,3 +312,35 @@ describe("end to end through pg-boss", () => {
     expect(await postsFor(key)).toBe(1);
   });
 });
+
+describe("PgPublicationStore checkpoints (T29/T32)", () => {
+  it("persists the adapter checkpoint and clears it once the post exists", async () => {
+    const channelId = await createChannel();
+    const { id } = await createPublication(channelId);
+    await store.saveCheckpoint(id, {
+      sessionUri: "https://www.googleapis.com/upload/x",
+      sizeBytes: 9,
+    });
+    const context = await store.loadContext(id);
+    expect(context?.publication.platformCheckpoint).toEqual({
+      sessionUri: "https://www.googleapis.com/upload/x",
+      sizeBytes: 9,
+    });
+    expect(context?.channel).toMatchObject({
+      mode: "draft",
+      liveUploadsEnabled: false,
+      credentialActive: false,
+    });
+
+    await store.markSucceeded(
+      id,
+      { externalId: "yt1", permalink: null, status: "processing" },
+      new Date(),
+    );
+    const { rows } = await pool.query<{ platform_checkpoint: unknown }>(
+      "select platform_checkpoint from public.publications where id = $1",
+      [id],
+    );
+    expect(rows[0]?.platform_checkpoint).toBeNull();
+  });
+});

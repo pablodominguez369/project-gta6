@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(6);
+select plan(8);
 
 insert into auth.users (id, email, aud, role) values
   ('e7000000-0000-4000-8000-000000000001', 'admin-live@example.test', 'authenticated', 'authenticated'),
@@ -61,6 +61,17 @@ select lives_ok(
   $$insert into public.publications (channel_id, idempotency_key, payload_json)
     values ('c7000000-0000-4000-8000-000000000001', 'pgtap-live-2', '{}')$$,
   'a publisher enqueues without a checkpoint'
+);
+
+select lives_ok(
+  $$select id, status, permalink from public.publications where idempotency_key = 'pgtap-live-2'$$,
+  'members still read the publication columns'
+);
+
+select throws_ok(
+  $$select platform_checkpoint from public.publications$$,
+  '42501', null,
+  'members cannot read the upload checkpoint'
 );
 
 select * from finish();

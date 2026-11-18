@@ -272,7 +272,9 @@ export class PgPublicationStore implements PublicationStore {
     await this.pool.query(
       `update public.publications
           set status = 'succeeded', external_id = $2, permalink = $3, published_at = $4,
-              error_code = null, next_attempt_at = null
+              error_code = null, next_attempt_at = null,
+              -- The upload session is useless (and sensitive) once the post exists.
+              platform_checkpoint = null
         where id = $1 and ${NOT_TERMINAL}`,
       [publicationId, external.externalId, external.permalink, publishedAt],
     );
