@@ -56,6 +56,15 @@ Rules enforced in SQL:
   deleted: remove their roles instead.
 - Spend limits default to `0` and only an admin can change them.
 - The last admin cannot be removed (role delete or user delete is rejected).
+- Analytics (Phase 5, ADR 0006): `metric_snapshots` holds one row per publication and window
+  (`1h`, `24h`, `7d`, `28d`); its platform is copied from the channel by trigger, unknown metrics
+  stay `null`, and a `manual` row is never overwritten by an automatic read. Members only read;
+  the worker writes, and admins, publishers and analysts record numbers with
+  `record_manual_metrics(publication_id, window, metrics)` (only known keys, non-negative, only
+  after the window has ended; audited).
+- `experiments` (one variable, one platform, control and variant) and `experiment_publications`
+  are written by admins and analysts; a publication can only join an experiment of its own
+  platform. Both are audited.
 - `audit_events` rejects UPDATE, DELETE and TRUNCATE for every role, including `service_role`.
 - Changes to `user_roles`, `system_controls`, `channels`, `credential_refs` and `publications` are
   audited automatically by trigger (changed columns and their new values; `secret_ref` excluded).
