@@ -259,6 +259,9 @@ each video page lists what a failed QC asked for (T27).
 - [ADR 0001](adr/0001-monolith-nextjs-supabase.md): Next.js + Supabase modular monolith
 - [ADR 0002](adr/0002-pg-boss-job-queue.md): pg-boss as the initial job queue
 - [ADR 0003](adr/0003-secret-references.md): secrets are referenced, never stored
+- [ADR 0004](adr/0004-llm-provider-and-spend-gate.md): LLM provider and spend gate
+- [ADR 0005](adr/0005-live-publishing-gates.md): real uploads behind three keys, private only
+- [ADR 0006](adr/0006-analytics-with-uncertainty.md): metrics in fixed windows, compared with their uncertainty
 
 Connectors and the publisher contract: [connectors.md](connectors.md).
 
@@ -273,3 +276,14 @@ See [ADR 0005](adr/0005-live-publishing-gates.md) and [platforms.md](platforms.m
   outcome could be lost, and `reconcile` receives it on the next attempt.
 - `manual` channels go through every gate and then wait as `awaiting_manual`; a person uploads
   the package and records the link ([runbook](runbooks/manual-publication.md)).
+
+## Analytics (Phase 5)
+
+See [ADR 0006](adr/0006-analytics-with-uncertainty.md) and
+[platforms.md](platforms.md#analytics-phase-5).
+
+- `metric_snapshots`: one row per publication and window (`1h`, `24h`, `7d`, `28d`), with the
+  platform, the source (`platform_api`, `manual`, `simulated`) and the original metric names.
+- The worker reads metrics for windows that are due through a `MetricsReader` per platform and
+  stores them idempotently; manual rows are never overwritten by the API.
+- The panel compares publications inside one platform, always with sample size and confidence.
