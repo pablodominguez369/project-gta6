@@ -354,6 +354,104 @@ export type Database = {
           },
         ];
       };
+      experiment_publications: {
+        Row: {
+          arm: Database["public"]["Enums"]["experiment_arm"];
+          assigned_by: string | null;
+          created_at: string;
+          experiment_id: string;
+          publication_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          arm: Database["public"]["Enums"]["experiment_arm"];
+          assigned_by?: string | null;
+          created_at?: string;
+          experiment_id: string;
+          publication_id: string;
+        };
+        Update: {
+          arm?: Database["public"]["Enums"]["experiment_arm"];
+          assigned_by?: string | null;
+          created_at?: string;
+          experiment_id?: string;
+          publication_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "experiment_publications_experiment_id_fkey";
+            columns: ["experiment_id"];
+            isOneToOne: false;
+            referencedRelation: "experiments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "experiment_publications_publication_id_fkey";
+            columns: ["publication_id"];
+            isOneToOne: false;
+            referencedRelation: "publications";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      experiments: {
+        Row: {
+          control_label: string;
+          created_at: string;
+          created_by: string | null;
+          ends_at: string | null;
+          hypothesis: string;
+          id: string;
+          min_sample_per_arm: number;
+          name: string;
+          platform: Database["public"]["Enums"]["platform"];
+          result_summary: Json | null;
+          starts_at: string | null;
+          status: Database["public"]["Enums"]["experiment_status"];
+          time_window: Database["public"]["Enums"]["metric_window"];
+          updated_at: string;
+          variable: Database["public"]["Enums"]["experiment_variable"];
+          variant_label: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          control_label: string;
+          created_at?: string;
+          created_by?: string | null;
+          ends_at?: string | null;
+          hypothesis: string;
+          id?: string;
+          min_sample_per_arm?: number;
+          name: string;
+          platform: Database["public"]["Enums"]["platform"];
+          result_summary?: Json | null;
+          starts_at?: string | null;
+          status?: Database["public"]["Enums"]["experiment_status"];
+          time_window?: Database["public"]["Enums"]["metric_window"];
+          updated_at?: string;
+          variable: Database["public"]["Enums"]["experiment_variable"];
+          variant_label: string;
+        };
+        Update: {
+          control_label?: string;
+          created_at?: string;
+          created_by?: string | null;
+          ends_at?: string | null;
+          hypothesis?: string;
+          id?: string;
+          min_sample_per_arm?: number;
+          name?: string;
+          platform?: Database["public"]["Enums"]["platform"];
+          result_summary?: Json | null;
+          starts_at?: string | null;
+          status?: Database["public"]["Enums"]["experiment_status"];
+          time_window?: Database["public"]["Enums"]["metric_window"];
+          updated_at?: string;
+          variable?: Database["public"]["Enums"]["experiment_variable"];
+          variant_label?: string;
+        };
+        Relationships: [];
+      };
       feed_sources: {
         Row: {
           consecutive_failures: number;
@@ -648,6 +746,90 @@ export type Database = {
             columns: ["voice_id"];
             isOneToOne: false;
             referencedRelation: "voices";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      metric_snapshots: {
+        Row: {
+          avg_view_percentage: number | null;
+          avg_watch_time_seconds: number | null;
+          captured_at: string;
+          comments: number | null;
+          created_at: string;
+          definition_version: number;
+          entered_by: string | null;
+          followers_delta: number | null;
+          id: string;
+          impressions: number | null;
+          likes: number | null;
+          platform: Database["public"]["Enums"]["platform"];
+          publication_id: string;
+          raw_metric_names: string[];
+          reach: number | null;
+          saves: number | null;
+          shares: number | null;
+          source: Database["public"]["Enums"]["metric_source"];
+          time_window: Database["public"]["Enums"]["metric_window"];
+          updated_at: string;
+          views: number | null;
+          watch_time_seconds: number | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          avg_view_percentage?: number | null;
+          avg_watch_time_seconds?: number | null;
+          captured_at?: string;
+          comments?: number | null;
+          created_at?: string;
+          definition_version?: number;
+          entered_by?: string | null;
+          followers_delta?: number | null;
+          id?: string;
+          impressions?: number | null;
+          likes?: number | null;
+          platform: Database["public"]["Enums"]["platform"];
+          publication_id: string;
+          raw_metric_names?: string[];
+          reach?: number | null;
+          saves?: number | null;
+          shares?: number | null;
+          source: Database["public"]["Enums"]["metric_source"];
+          time_window: Database["public"]["Enums"]["metric_window"];
+          updated_at?: string;
+          views?: number | null;
+          watch_time_seconds?: number | null;
+        };
+        Update: {
+          avg_view_percentage?: number | null;
+          avg_watch_time_seconds?: number | null;
+          captured_at?: string;
+          comments?: number | null;
+          created_at?: string;
+          definition_version?: number;
+          entered_by?: string | null;
+          followers_delta?: number | null;
+          id?: string;
+          impressions?: number | null;
+          likes?: number | null;
+          platform?: Database["public"]["Enums"]["platform"];
+          publication_id?: string;
+          raw_metric_names?: string[];
+          reach?: number | null;
+          saves?: number | null;
+          shares?: number | null;
+          source?: Database["public"]["Enums"]["metric_source"];
+          time_window?: Database["public"]["Enums"]["metric_window"];
+          updated_at?: string;
+          views?: number | null;
+          watch_time_seconds?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "metric_snapshots_publication_id_fkey";
+            columns: ["publication_id"];
+            isOneToOne: false;
+            referencedRelation: "publications";
             referencedColumns: ["id"];
           },
         ];
@@ -1286,7 +1468,19 @@ export type Database = {
       has_role: { Args: { required: Database["public"]["Enums"]["app_role"] }; Returns: boolean };
       is_member: { Args: Record<PropertyKey, never>; Returns: boolean };
       media_project_is_editable: { Args: { p_project_id: string }; Returns: boolean };
+      metric_window_interval: {
+        Args: { w: Database["public"]["Enums"]["metric_window"] };
+        Returns: string;
+      };
       read_vault_secret: { Args: { secret_ref: string }; Returns: string };
+      record_manual_metrics: {
+        Args: {
+          metrics: Json;
+          publication_id: string;
+          time_window: Database["public"]["Enums"]["metric_window"];
+        };
+        Returns: string;
+      };
       revoke_channel_credentials: {
         Args: { actor_id: string; channel_id: string };
         Returns: undefined;
@@ -1312,9 +1506,14 @@ export type Database = {
       channel_mode: "draft" | "approval" | "autopublish" | "manual";
       claim_certainty: "confirmed" | "reported" | "rumor" | "speculation" | "opinion";
       credential_status: "pending" | "active" | "expired" | "revoked";
+      experiment_arm: "control" | "variant";
+      experiment_status: "draft" | "running" | "finished" | "cancelled";
+      experiment_variable: "hook" | "duration" | "time_slot" | "topic";
       feed_kind: "rss" | "atom";
       job_run_status: "queued" | "running" | "succeeded" | "failed" | "blocked";
       media_project_status: "draft" | "queued" | "rendering" | "rendered" | "blocked" | "failed";
+      metric_source: "platform_api" | "manual" | "simulated";
+      metric_window: "1h" | "24h" | "7d" | "28d";
       opportunity_status: "new" | "shortlisted" | "accepted" | "discarded" | "expired";
       platform: "youtube" | "instagram" | "tiktok" | "simulated";
       publication_status:
@@ -1458,9 +1657,14 @@ export const Constants = {
       channel_mode: ["draft", "approval", "autopublish", "manual"],
       claim_certainty: ["confirmed", "reported", "rumor", "speculation", "opinion"],
       credential_status: ["pending", "active", "expired", "revoked"],
+      experiment_arm: ["control", "variant"],
+      experiment_status: ["draft", "running", "finished", "cancelled"],
+      experiment_variable: ["hook", "duration", "time_slot", "topic"],
       feed_kind: ["rss", "atom"],
       job_run_status: ["queued", "running", "succeeded", "failed", "blocked"],
       media_project_status: ["draft", "queued", "rendering", "rendered", "blocked", "failed"],
+      metric_source: ["platform_api", "manual", "simulated"],
+      metric_window: ["1h", "24h", "7d", "28d"],
       opportunity_status: ["new", "shortlisted", "accepted", "discarded", "expired"],
       platform: ["youtube", "instagram", "tiktok", "simulated"],
       publication_status: [
