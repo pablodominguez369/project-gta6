@@ -204,6 +204,37 @@ selects only offer assets and voices usable right now; the worker checks again b
 Clients only edit drafts and queue them (`guard_media_project`); `renders` are written by the
 worker only.
 
+### Render worker (T24)
+
+`media.render` jobs (one per project, no queue retries) come from an outbox dispatcher over
+`media_projects` (queued and due, or `rendering` for more than 30 minutes). `renderProject` in
+`packages/jobs/src/media/render-project.ts` fails closed, in this order:
+
+1. Claims the project atomically (`update ... returning`); a second run is skipped. At most 10
+   claims per project, so a crashing render cannot loop.
+2. The script must still be approved.
+3. Rights gate (`evaluateRightsGate`) for every asset, for commercial use, with and without each
+   target platform. Anything not `original`/`cleared` with a license in force blocks (rule 3).
+4. Voice check (`evaluateVoice`, rule 5); the active TTS provider must be the voice's provider.
+   `TTS_PROVIDER=disabled` blocks.
+5. Downloads every asset from the private bucket and compares its SHA-256 with the registry.
+6. Narration line by line through `synthesizeWithSpendGate` (same `llm_usage` table and limits
+   as the LLM, purpose `tts.synthesize`). Spend limit, rate limit or an unknown outcome puts the
+   project back in the queue with `next_attempt_at`; other errors fail it.
+7. Storyboard, ASS subtitles with the closing card (attributions plus the independence notice)
+   and the FFmpeg run (`buildRenderArgs`: argument array, never a shell). The master is
+   1080x1920, 30 fps, H.264 high/yuv420p, AAC 48 kHz, loudness normalised to -14 LUFS, fast start.
+8. Technical QC (`evaluateRenderQc`): size, codecs, audio present and not silent, duration within
+   500 ms and under 62.5 s, file size, no black interval over 1 s, no overflowing text. A failed
+   QC stores the render but marks the project `failed` with the reasons.
+9. Uploads `renders/<project>/v<N>/master.mp4` and `manifest.json` (never overwriting) and
+   inserts the `renders` row. The manifest records the template, FFmpeg version and arguments,
+   subtitle hash, script version, voice and per-line audio hashes, and every source hash with
+   its rights status and license, so a render can be reproduced and audited.
+
+Only the master is rendered. Per-platform encodes wait until each platform's current upload specs
+are checked (rule 2, Phase 4). The worker image installs `ffmpeg` and `fonts-dejavu-core`.
+
 ## Decisions
 
 - [ADR 0001](adr/0001-monolith-nextjs-supabase.md): Next.js + Supabase modular monolith

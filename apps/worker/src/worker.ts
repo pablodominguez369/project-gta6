@@ -1,25 +1,32 @@
 import {
   createLlmProvider,
   DisabledLlmProvider,
+  DisabledTtsProvider,
   EnvSecretStore,
+  FakeTtsProvider,
   SimulatedPublisher,
   type LlmProvider,
+  type TtsProvider,
 } from "@gta6/connectors";
 import { createAdminClient } from "@gta6/db";
 import {
   createDiscoveryPollHandler,
+  createMediaRenderHandler,
   createOpportunityBuildHandler,
   createPublishHandler,
   createScriptDraftHandler,
   PgBossQueue,
   PgLlmUsageStore,
+  SupabaseMediaStore,
   PgPublicationStore,
   PgSimulatedRemoteStore,
+  mediaRenderPayloadSchema,
   publishSimulatedPayloadSchema,
   QUEUES,
   scheduleDiscoveryPoll,
   scriptDraftPayloadSchema,
   startDispatcher,
+  startMediaDispatcher,
   startScriptDispatcher,
   trackJobRuns,
   type JobQueue,
@@ -109,6 +116,30 @@ export async function startWorker(source: NodeJS.ProcessEnv = process.env): Prom
   );
   const scriptDispatcher = startScriptDispatcher(pool, queue, logger);
 
+  // Phase 3: renders. Rights, voice and file hashes are checked before anything is produced,
+  // and narration goes through the same spend gate as the LLM.
+  const tts = buildTtsProvider(env, logger);
+  await queue.work(
+    QUEUES.mediaRender.name,
+    trackJobRuns(
+      db,
+      logger,
+      createMediaRenderHandler({
+        pool,
+        tts,
+        store: new PgLlmUsageStore(pool),
+        media: new SupabaseMediaStore(db),
+        binaries: { ffmpeg: env.FFMPEG_PATH, ffprobe: env.FFPROBE_PATH },
+        fontsDir: env.RENDER_FONTS_DIR,
+      }),
+      {
+        targetType: "media_projects",
+        targetId: (data) => mediaRenderPayloadSchema.safeParse(data).data?.projectId,
+      },
+    ),
+  );
+  const mediaDispatcher = startMediaDispatcher(pool, queue, logger);
+
   logger.info({ queues: Object.values(QUEUES).map((q) => q.name) }, "worker started");
 
   return {
@@ -119,6 +150,7 @@ export async function startWorker(source: NodeJS.ProcessEnv = process.env): Prom
       discoverySchedule.stop();
       await dispatcher.stop();
       await scriptDispatcher.stop();
+      await mediaDispatcher.stop();
       await queue.stop({ timeoutMs: 30_000 });
       await pool.end();
       logger.info("worker stopped");
@@ -141,4 +173,11 @@ async function buildLlmProvider(
   }
   logger.info({ llmProvider: result.value.name }, "LLM provider ready");
   return result.value;
+}
+
+/** Only the local fake exists today; anything else keeps narration off (safe block). */
+function buildTtsProvider(env: ReturnType<typeof loadWorkerEnv>, logger: Logger): TtsProvider {
+  const provider = env.TTS_PROVIDER === "fake" ? new FakeTtsProvider() : new DisabledTtsProvider();
+  logger.info({ ttsProvider: provider.name }, "TTS provider ready");
+  return provider;
 }

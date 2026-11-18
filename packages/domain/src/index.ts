@@ -13,3 +13,4 @@ export * from "./spend";
 export * from "./rights";
 export * from "./voice";
 export * from "./storyboard";
+export * from "./render-qc";

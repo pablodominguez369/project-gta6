@@ -65,6 +65,11 @@ export const workerEnvSchema = baseEnvSchema
      * word, local only, so renders can be tested end to end without any provider.
      */
     TTS_PROVIDER: z.enum(TTS_PROVIDERS).default("disabled"),
+    /** FFmpeg binaries for renders (installed in the worker image). */
+    FFMPEG_PATH: z.string().min(1).default("ffmpeg"),
+    FFPROBE_PATH: z.string().min(1).default("ffprobe"),
+    /** Folder with the subtitle font (DejaVu Sans from the fonts-dejavu-core package). */
+    RENDER_FONTS_DIR: z.string().min(1).default("/usr/share/fonts/truetype/dejavu"),
   })
   .superRefine((env, ctx) => {
     if (env.LLM_PROVIDER === "anthropic" && !env.LLM_API_KEY_REF) {
