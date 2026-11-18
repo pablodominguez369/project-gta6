@@ -156,4 +156,60 @@ describe("processPublication", () => {
     expect(outcome.kind === "retry" && outcome.error.code).toBe("CONFLICT");
     expect(store.row.status).toBe("queued");
   });
+
+  it("publishes a render whose rights, voice and QC are still valid", async () => {
+    const { store, remote, run } = setup();
+    store.media = cleanMedia();
+    store.payload = { ...(store.payload as object), syntheticMedia: true };
+    expect(await run(1)).toEqual({ kind: "succeeded", via: "publish" });
+    expect(await remote.count()).toBe(1);
+  });
+
+  it("blocks a render whose asset rights changed, without calling the platform", async () => {
+    const { store, remote, run } = setup();
+    store.media = {
+      ...cleanMedia(),
+      assets: [{ id: "a1", origin: "original_work", rightsStatus: "disputed", license: null }],
+    };
+    store.payload = { ...(store.payload as object), syntheticMedia: true };
+    expect(await run(1)).toEqual({ kind: "failed", code: "RIGHTS_BLOCKED" });
+    expect(store.row.status).toBe("failed");
+    expect(store.audit.at(-1)?.action).toBe("publications.rights_blocked");
+    expect(await remote.count()).toBe(0);
+  });
+
+  it("blocks a synthetic voice that the publication does not declare", async () => {
+    const { store, remote, run } = setup();
+    store.media = cleanMedia();
+    expect(await run(1)).toEqual({ kind: "failed", code: "RIGHTS_BLOCKED" });
+    expect(await remote.count()).toBe(0);
+  });
+
+  it("reconciles before the media gate, so an existing post is never hidden", async () => {
+    const { store, run } = setup({ publish: ["timeout_after_accept"] });
+    store.media = cleanMedia();
+    store.payload = { ...(store.payload as object), syntheticMedia: true };
+    await run(1);
+    store.media = { ...cleanMedia(), qcPassed: false };
+    expect(await run(2)).toEqual({ kind: "succeeded", via: "reconcile" });
+  });
 });
+
+function cleanMedia(): NonNullable<MemoryPublicationStore["media"]> {
+  return {
+    renderId: "r1",
+    qcPassed: true,
+    disclosureRequired: true,
+    assets: [{ id: "a1", origin: "original_work", rightsStatus: "original", license: null }],
+    missingAssetIds: [],
+    voice: {
+      id: "v1",
+      provider: "fake",
+      approved: true,
+      revoked: false,
+      imitatesRealPerson: false,
+      hasConsentProof: false,
+      license: null,
+    },
+  };
+}

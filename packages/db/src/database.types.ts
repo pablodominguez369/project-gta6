@@ -737,6 +737,7 @@ export type Database = {
           permalink: string | null;
           published_at: string | null;
           reconcile_required: boolean;
+          render_id: string | null;
           scheduled_at: string | null;
           status: Database["public"]["Enums"]["publication_status"];
           updated_at: string;
@@ -755,6 +756,7 @@ export type Database = {
           permalink?: string | null;
           published_at?: string | null;
           reconcile_required?: boolean;
+          render_id?: string | null;
           scheduled_at?: string | null;
           status?: Database["public"]["Enums"]["publication_status"];
           updated_at?: string;
@@ -772,6 +774,7 @@ export type Database = {
           permalink?: string | null;
           published_at?: string | null;
           reconcile_required?: boolean;
+          render_id?: string | null;
           scheduled_at?: string | null;
           status?: Database["public"]["Enums"]["publication_status"];
           updated_at?: string;
@@ -782,6 +785,13 @@ export type Database = {
             columns: ["channel_id"];
             isOneToOne: false;
             referencedRelation: "channels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "publications_render_id_fkey";
+            columns: ["render_id"];
+            isOneToOne: false;
+            referencedRelation: "renders";
             referencedColumns: ["id"];
           },
         ];

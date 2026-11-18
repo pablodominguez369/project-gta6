@@ -1,6 +1,22 @@
 import type { ExternalPublication } from "@gta6/connectors";
-import type { ErrorCode, Platform, PublicationStatus } from "@gta6/domain";
+import type {
+  AssetOrigin,
+  ErrorCode,
+  Platform,
+  PublicationMedia,
+  PublicationStatus,
+  RightsStatus,
+} from "@gta6/domain";
 import type pg from "pg";
+
+import {
+  LICENSE_JSON,
+  toLicense,
+  toVoiceRecord,
+  VOICE_COLUMNS,
+  type LicenseJson,
+  type VoiceRow,
+} from "../media/rights-rows";
 
 /** Everything the orchestrator needs for one attempt, read fresh under the channel lock. */
 export interface PublicationContext {
@@ -22,6 +38,8 @@ export interface PublicationContext {
   readonly systemPaused: boolean;
   /** published_at of the channel's successful publications in the last 48 hours. */
   readonly recentPublishedAt: readonly Date[];
+  /** The linked render with the CURRENT rights of its assets and voice; null when none. */
+  readonly media: PublicationMedia | null;
 }
 
 /** Status changes the orchestrator may request. Terminal success goes through markSucceeded. */
@@ -76,6 +94,11 @@ interface ContextRow {
   min_minutes_between_posts: number;
   global_paused: boolean;
   recent_published_at: Date[] | null;
+  render_id: string | null;
+  qc_passed: boolean | null;
+  disclosure_required: boolean | null;
+  asset_ids: string[] | null;
+  voice_id: string | null;
 }
 
 /** Updates never touch a terminal row, whatever the caller asks for. */
@@ -121,7 +144,11 @@ export class PgPublicationStore implements PublicationStore {
     const { rows } = await this.pool.query<ContextRow>(
       `select p.id, p.channel_id, p.status, p.idempotency_key, p.payload_json, p.reconcile_required,
               c.platform, c.paused, c.timezone, c.max_posts_per_day, c.min_minutes_between_posts,
-              s.global_paused,
+              s.global_paused, p.render_id, r.qc_passed, r.disclosure_required,
+              (select array_agg(src->>'assetId')
+                 from jsonb_array_elements(coalesce(r.manifest->'sources', '[]'::jsonb)) src)
+                as asset_ids,
+              r.manifest->'voice'->>'id' as voice_id,
               (select array_agg(r.published_at order by r.published_at)
                  from public.publications r
                 where r.channel_id = p.channel_id
@@ -129,6 +156,7 @@ export class PgPublicationStore implements PublicationStore {
                   and r.published_at > now() - interval '48 hours') as recent_published_at
          from public.publications p
          join public.channels c on c.id = p.channel_id
+         left join public.renders r on r.id = p.render_id
         cross join public.system_controls s
         where p.id = $1`,
       [publicationId],
@@ -153,6 +181,47 @@ export class PgPublicationStore implements PublicationStore {
       },
       systemPaused: row.global_paused,
       recentPublishedAt: row.recent_published_at ?? [],
+      media: await this.loadMedia(row),
+    };
+  }
+
+  /** Reads the render's assets and voice from the registry as they are NOW. */
+  private async loadMedia(row: ContextRow): Promise<PublicationMedia | null> {
+    if (row.render_id === null) return null;
+    const assetIds = row.asset_ids ?? [];
+    const { rows: assets } = await this.pool.query<{
+      id: string;
+      origin: AssetOrigin;
+      rights_status: RightsStatus;
+      license: LicenseJson | null;
+    }>(
+      `select a.id, a.origin, a.rights_status, ${LICENSE_JSON} as license
+         from public.assets a left join public.licenses l on l.id = a.license_id
+        where a.id::text = any($1)`,
+      [assetIds],
+    );
+    const voice = row.voice_id
+      ? (
+          await this.pool.query<VoiceRow>(
+            `select ${VOICE_COLUMNS}
+               from public.voices v left join public.licenses l on l.id = v.license_id
+              where v.id::text = $1`,
+            [row.voice_id],
+          )
+        ).rows[0]
+      : undefined;
+    return {
+      renderId: row.render_id,
+      qcPassed: row.qc_passed === true,
+      disclosureRequired: row.disclosure_required !== false,
+      assets: assets.map((a) => ({
+        id: a.id,
+        origin: a.origin,
+        rightsStatus: a.rights_status,
+        license: toLicense(a.license),
+      })),
+      missingAssetIds: assetIds.filter((id) => !assets.some((a) => a.id === id)),
+      voice: voice ? toVoiceRecord(voice) : null,
     };
   }
 

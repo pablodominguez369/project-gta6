@@ -2,6 +2,7 @@ import type { PublisherAdapter, PublishRequest } from "@gta6/connectors";
 import {
   checkFrequency,
   DomainError,
+  evaluatePublicationMedia,
   evaluatePublishGates,
   isTerminal,
   publicationPayloadSchema,
@@ -130,6 +131,25 @@ async function attempt(
     logger.info("reconciliation: not on platform, publishing");
   }
 
+  // Rights, QC, voice and disclosure of the video, re-checked before every new
+  // publish (rules 3 and 5). After reconciliation, so a post that already exists is never hidden.
+  const media = evaluatePublicationMedia({
+    platform: context.channel.platform,
+    media: context.media,
+    declaresSyntheticMedia: request.syntheticMedia,
+    at: now(),
+  });
+  if (!media.ok) {
+    await store.update(id, { status: "failed", errorCode: "RIGHTS_BLOCKED" });
+    await store.recordAudit({
+      action: "publications.rights_blocked",
+      publicationId: id,
+      details: { issues: media.issues.join(","), renderId: context.media?.renderId ?? null },
+    });
+    logger.warn({ issues: media.issues }, "publication blocked by the media gate");
+    return { kind: "failed", code: "RIGHTS_BLOCKED" };
+  }
+
   const frequency = checkFrequency({
     now: now(),
     timezone: context.channel.timezone,
@@ -177,6 +197,7 @@ function buildRequest(context: PublicationContext): PublishRequest | null {
     title: payload.data.title,
     description: payload.data.description,
     mediaRef: payload.data.mediaRef,
+    syntheticMedia: payload.data.syntheticMedia,
     // The dispatcher only enqueues once scheduled_at has passed, so the post goes out now.
     scheduledAt: null,
   };

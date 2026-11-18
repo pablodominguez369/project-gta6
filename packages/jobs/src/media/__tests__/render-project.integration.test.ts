@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { FakeTtsProvider } from "@gta6/connectors";
+import { FakeTtsProvider, SimulatedPublisher } from "@gta6/connectors";
 import { DomainError } from "@gta6/domain";
 import { createLogger } from "@gta6/observability";
 import pg from "pg";
@@ -11,6 +11,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { testDatabaseUrl } from "../../__tests__/test-db";
 import { PgLlmUsageStore } from "../../llm/llm-usage-store";
+import { PgSimulatedRemoteStore } from "../../publishing/pg-simulated-remote-store";
+import { processPublication } from "../../publishing/process-publication";
+import { PgPublicationStore } from "../../publishing/publication-store";
 import { dispatchMediaRenders } from "../dispatcher";
 import { runProcess } from "../ffmpeg";
 import { MemoryMediaStore } from "../media-store";
@@ -29,6 +32,7 @@ let backgroundPng = new Uint8Array();
 let workDir = "";
 const assetIds: string[] = [];
 const projectIds: string[] = [];
+let channelId = "";
 
 const sha256 = (data: Uint8Array): string => createHash("sha256").update(data).digest("hex");
 
@@ -168,6 +172,15 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await setLimits(0, 0);
+  if (channelId) {
+    await pool.query(
+      `delete from public.simulated_platform_posts where idempotency_key in
+         (select idempotency_key from public.publications where channel_id = $1)`,
+      [channelId],
+    );
+    await pool.query("delete from public.publications where channel_id = $1", [channelId]);
+    await pool.query("delete from public.channels where id = $1", [channelId]);
+  }
   await pool.query("delete from public.renders where project_id = any($1)", [projectIds]);
   await pool.query("delete from public.media_project_scenes where project_id = any($1)", [
     projectIds,
@@ -310,5 +323,69 @@ describe("renderProject", () => {
 
     expect(outcome.kind).toBe("failed");
     expect((await projectRow(id))?.status).toBe("failed");
+  });
+});
+
+describe("publishing a render", () => {
+  async function publicationFor(renderId: string, syntheticMedia: boolean): Promise<string> {
+    if (!channelId) {
+      const channel = await pool.query<{ id: string }>(
+        `insert into public.channels (platform, display_name, max_posts_per_day,
+                                      min_minutes_between_posts)
+         values ('simulated', $1, 50, 0) returning id`,
+        [`Render IT ${run}`],
+      );
+      channelId = channel.rows[0]?.id ?? "";
+    }
+    const { rows } = await pool.query<{ id: string }>(
+      `insert into public.publications (channel_id, idempotency_key, payload_json, render_id)
+       values ($1, $2, $3, $4) returning id`,
+      [
+        channelId,
+        `it-render-${randomUUID()}`,
+        JSON.stringify({ title: "Vídeo", description: "", mediaRef: "renders/x", syntheticMedia }),
+        renderId,
+      ],
+    );
+    return rows[0]?.id ?? "";
+  }
+
+  const publish = (publicationId: string) =>
+    processPublication(
+      {
+        store: new PgPublicationStore(pool),
+        publisher: new SimulatedPublisher({ store: new PgSimulatedRemoteStore(pool) }),
+        logger,
+      },
+      { publicationId, attempt: 1, maxAttempts: 4 },
+    );
+
+  it("publishes a valid render and blocks it once an asset's rights are disputed", async () => {
+    await setLimits(5, 50);
+    const media = new MemoryMediaStore();
+    const asset = await newAsset(media, "original");
+    const outcome = await renderProject(deps(media), await newProject(asset.id));
+    if (outcome.kind !== "rendered") throw new Error(`render failed: ${outcome.kind}`);
+
+    expect(await publish(await publicationFor(outcome.renderId, true))).toEqual({
+      kind: "succeeded",
+      via: "publish",
+    });
+    // The synthetic voice must be declared.
+    expect(await publish(await publicationFor(outcome.renderId, false))).toEqual({
+      kind: "failed",
+      code: "RIGHTS_BLOCKED",
+    });
+
+    await pool.query("update public.assets set rights_status = 'disputed' where id = $1", [
+      asset.id,
+    ]);
+    const blocked = await publicationFor(outcome.renderId, true);
+    expect(await publish(blocked)).toEqual({ kind: "failed", code: "RIGHTS_BLOCKED" });
+    const { rows } = await pool.query<{ status: string; error_code: string }>(
+      "select status, error_code from public.publications where id = $1",
+      [blocked],
+    );
+    expect(rows[0]).toEqual({ status: "failed", error_code: "RIGHTS_BLOCKED" });
   });
 });

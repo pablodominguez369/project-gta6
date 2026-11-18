@@ -17,11 +17,20 @@ const STATUS_LABELS: Record<string, string> = {
   blocked: "Bloqueada",
 };
 
+/** Why a publication stopped, in plain words. */
+const ERROR_LABELS: Record<string, string> = {
+  RIGHTS_BLOCKED:
+    "Bloqueada por derechos: algún archivo, licencia o la voz del vídeo ya no es válido, o falta el aviso de voz sintética.",
+  SYSTEM_PAUSED: "Pausa global activa.",
+  CHANNEL_PAUSED: "El canal está en pausa.",
+  RATE_LIMITED: "Límite de frecuencia del canal: se reintentará.",
+};
+
 export default async function PublicationsPage() {
   const user = await requireRole("member");
   const canEnqueue = user.roles.includes("admin") || user.roles.includes("publisher");
   const supabase = await createSupabaseServerClient();
-  const [{ data: publications }, { data: channels }] = await Promise.all([
+  const [{ data: publications }, { data: channels }, { data: renders }] = await Promise.all([
     supabase
       .from("publications")
       .select(
@@ -34,13 +43,21 @@ export default async function PublicationsPage() {
       .select("id, display_name")
       .eq("platform", "simulated")
       .order("created_at", { ascending: true }),
+    supabase
+      .from("renders")
+      .select("id, version, created_at, media_projects(scripts(opportunities(topic)))")
+      .eq("qc_passed", true)
+      .eq("profile", "master")
+      .order("created_at", { ascending: false })
+      .limit(30),
   ]);
 
   return (
     <section className="flex flex-col gap-6">
       <h1 className="text-xl font-semibold">Publicaciones</h1>
       <p className="text-sm text-neutral-600 dark:text-neutral-400">
-        Fase 1: solo publicación simulada. Nada sale a ninguna plataforma real.
+        Solo publicación simulada: nada sale a ninguna plataforma real. Antes de cada intento se
+        vuelven a comprobar los derechos, la voz y el control técnico del vídeo.
       </p>
 
       {canEnqueue ? (
@@ -61,6 +78,18 @@ export default async function PublicationsPage() {
                     value: channel.id,
                     label: channel.display_name,
                   }))}
+                />
+              </Field>
+              <Field label="Vídeo">
+                <Select
+                  name="renderId"
+                  options={[
+                    { value: "", label: "Sin vídeo (solo simulación)" },
+                    ...(renders ?? []).map((render) => ({
+                      value: render.id,
+                      label: `${render.media_projects.scripts.opportunities.topic} · v${String(render.version)} · ${formatDateTime(render.created_at)}`,
+                    })),
+                  ]}
                 />
               </Field>
               <Field label="Título">
@@ -102,7 +131,11 @@ export default async function PublicationsPage() {
                   <td className="py-2 pr-4">
                     {STATUS_LABELS[publication.status] ?? publication.status}
                   </td>
-                  <td className="py-2 pr-4">{publication.error_code ?? "—"}</td>
+                  <td className="py-2 pr-4">
+                    {publication.error_code
+                      ? (ERROR_LABELS[publication.error_code] ?? publication.error_code)
+                      : "—"}
+                  </td>
                   <td className="py-2 pr-4 font-mono text-xs">{publication.external_id ?? "—"}</td>
                   <td className="py-2 pr-4">{formatDateTime(publication.created_at)}</td>
                   <td className="py-2">{formatDateTime(publication.published_at)}</td>

@@ -23,6 +23,8 @@ export const publishRequestSchema = z.object({
   description: z.string().max(5_000),
   /** Reference to the rendered media in our storage (never a signed URL). */
   mediaRef: z.string().min(1),
+  /** The video contains synthetic media (AI voice); adapters set the platform's AI label. */
+  syntheticMedia: z.boolean(),
   scheduledAt: z.iso.datetime().nullable(),
 });
 

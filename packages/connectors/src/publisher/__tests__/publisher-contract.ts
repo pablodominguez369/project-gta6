@@ -21,6 +21,7 @@ export function sampleRequest(overrides: Partial<PublishRequest> = {}): PublishR
     title: "Contract test",
     description: "Contract test description",
     mediaRef: "renders/contract-test.mp4",
+    syntheticMedia: false,
     scheduledAt: null,
     ...overrides,
   };

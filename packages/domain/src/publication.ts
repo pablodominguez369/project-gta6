@@ -41,6 +41,8 @@ export const publicationPayloadSchema = z.object({
   title: z.string().trim().min(1).max(100),
   description: z.string().trim().max(5_000),
   mediaRef: z.string().min(1).max(500),
+  /** Declared to the platform when the video uses a synthetic voice (rule 5). */
+  syntheticMedia: z.boolean().default(false),
 });
 export type PublicationPayload = z.infer<typeof publicationPayloadSchema>;
 

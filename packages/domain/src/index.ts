@@ -12,5 +12,6 @@ export * from "./source-normalization";
 export * from "./spend";
 export * from "./rights";
 export * from "./voice";
+export * from "./publication-media";
 export * from "./storyboard";
 export * from "./render-qc";
