@@ -26,13 +26,25 @@ export function Select({
   name,
   options,
   defaultValue,
+  placeholder,
 }: {
   readonly name: string;
   readonly options: readonly { value: string; label: string }[];
   readonly defaultValue?: string;
+  /** Shown first with an empty value, so nothing is chosen until the person picks. */
+  readonly placeholder?: string;
 }) {
   return (
-    <select name={name} defaultValue={defaultValue} className={INPUT_CLASS}>
+    <select
+      name={name}
+      defaultValue={defaultValue ?? (placeholder ? "" : undefined)}
+      className={INPUT_CLASS}
+    >
+      {placeholder ? (
+        <option value="" disabled>
+          {placeholder}
+        </option>
+      ) : null}
       {options.map((option) => (
         <option key={option.value} value={option.value}>
           {option.label}

@@ -47,6 +47,11 @@ export const publicationPayloadSchema = z.object({
   mediaRef: z.string().min(1).max(500),
   /** Declared to the platform when the video uses a synthetic voice (rule 5). */
   syntheticMedia: z.boolean().default(false),
+  /**
+   * The person queuing chose the (private) visibility explicitly. TikTok's UX rules require it
+   * for every post, with no default; the TikTok adapter refuses a request without it.
+   */
+  visibilityConfirmed: z.boolean().default(false),
 });
 export type PublicationPayload = z.infer<typeof publicationPayloadSchema>;
 

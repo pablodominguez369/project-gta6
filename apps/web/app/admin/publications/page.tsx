@@ -111,12 +111,24 @@ export default async function PublicationsPage() {
                   ]}
                 />
               </Field>
+              <Field label="Visibilidad">
+                <Select
+                  name="visibility"
+                  placeholder="Elige la visibilidad"
+                  options={[{ value: "private", label: "Privado: solo la cuenta lo ve (Solo yo)" }]}
+                />
+              </Field>
               <Field label="Título">
                 <TextInput name="title" required maxLength={100} />
               </Field>
               <Field label="Descripción">
                 <TextInput name="description" maxLength={5000} />
               </Field>
+              <p className="text-xs text-neutral-500">
+                Nada se publica en público. Si el canal es de TikTok: al publicar, aceptas la
+                Confirmación de uso de música de TikTok; los comentarios, dúos y stitch quedan
+                desactivados, y el vídeo puede tardar unos minutos en procesarse.
+              </p>
             </ActionForm>
           ) : (
             <p className="text-sm">

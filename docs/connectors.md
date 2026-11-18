@@ -100,6 +100,27 @@ in-memory fake of the Data API; it never reaches the network in tests.
   other 403 → `FORBIDDEN`; 400 → `VALIDATION_FAILED`; 5xx/network before the upload →
   `EXTERNAL_UNAVAILABLE`.
 
+## TikTok adapter (T33)
+
+`TikTokPublisher` (`packages/connectors/src/publisher/tiktok`), contract-tested against an
+in-memory fake of the Content Posting API.
+
+- `creator_info/query` first: the account must allow `SELF_ONLY`, otherwise `FORBIDDEN`.
+- `video/init` with `FILE_UPLOAD`, `privacy_level=SELF_ONLY`, comments/duet/stitch disabled,
+  commercial toggles off, `is_aigc` from the render. Caption = title + description, at most 2200
+  characters.
+- The `publish_id` is saved as checkpoint before the first chunk. Chunks of 10 MB (a file under
+  5 MB is one chunk; the remainder joins the last chunk). A lost chunk answer is
+  `AMBIGUOUS_EXTERNAL_STATE`.
+- Reconciliation reads `status/fetch`: `PUBLISH_COMPLETE`/`SEND_TO_USER_INBOX` = exists,
+  `FAILED` or unknown `publish_id` = safe to post again, anything still processing = error
+  (the publication stays ambiguous and is retried or reconciled by hand, never posted twice).
+- Private posts get no public post id, so `external_id` is the `publish_id` and there is no
+  permalink.
+- The person queuing must pick the visibility explicitly (no default, TikTok UX rules); the
+  adapter refuses requests without `visibilityConfirmed`. Still pending before any TikTok audit
+  (Phase 6): showing the creator's nickname and a preview in the panel before posting.
+
 ## Text to speech (Phase 3, T22)
 
 `TtsProvider.synthesize({ text, locale, providerVoiceId })` returns encoded audio (WAV or MP3),

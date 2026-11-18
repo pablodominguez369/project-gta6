@@ -221,3 +221,13 @@ describe("publicationPayloadSchema", () => {
     );
   });
 });
+
+describe("publicationPayloadSchema visibility", () => {
+  it("is not confirmed unless the person chose it", () => {
+    const base = { title: "T", description: "", mediaRef: "renders/x.mp4" };
+    expect(publicationPayloadSchema.parse(base).visibilityConfirmed).toBe(false);
+    expect(
+      publicationPayloadSchema.parse({ ...base, visibilityConfirmed: true }).visibilityConfirmed,
+    ).toBe(true);
+  });
+});

@@ -253,6 +253,7 @@ function buildRequest(context: PublicationContext): PublishRequest | null {
     // The dispatcher only enqueues once scheduled_at has passed, so the post goes out now.
     scheduledAt: null,
     visibility: "private",
+    visibilityConfirmed: payload.data.visibilityConfirmed,
   };
 }
 
