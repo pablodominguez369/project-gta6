@@ -16,6 +16,11 @@ export interface PlatformTokenSource {
 /** Our private media bucket (the render's master MP4). Same shape as the worker's MediaStore. */
 export interface PublisherMediaSource {
   download(path: string): Promise<Uint8Array | null>;
+  /**
+   * Short-lived signed URL for platforms that fetch the file themselves (Instagram). Created at
+   * the moment of use and never stored (not in checkpoints, logs or audit).
+   */
+  signedUrl?(path: string, expiresInSeconds: number): Promise<string | null>;
 }
 
 export interface PlatformPublisherDeps {

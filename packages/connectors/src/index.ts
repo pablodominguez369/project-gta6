@@ -19,3 +19,4 @@ export * from "./oauth/configured-providers";
 export * from "./publisher/platform-deps";
 export * from "./publisher/youtube/youtube-publisher";
 export * from "./publisher/tiktok/tiktok-publisher";
+export * from "./publisher/instagram/instagram-publisher";
