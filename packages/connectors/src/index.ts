@@ -8,3 +8,5 @@ export * from "./tts/tts-provider";
 export * from "./llm/anthropic-llm-provider";
 export * from "./llm/fake-llm-provider";
 export * from "./llm/create-llm-provider";
+export * from "./tts/fake-tts-provider";
+export * from "./tts/wav";

@@ -3,13 +3,13 @@
 All external providers sit behind interfaces in `packages/connectors`. The domain never imports a
 vendor SDK directly.
 
-| Interface           | Phase 1 implementation                    | Status                       |
-| ------------------- | ----------------------------------------- | ---------------------------- |
-| `PublisherAdapter`  | `SimulatedPublisher`                      | Implemented, contract-tested |
-| `LlmProvider`       | `FakeLlmProvider`, `AnthropicLlmProvider` | Off by default, spend-gated  |
-| `TtsProvider`       | none                                      | Contract only (Phase 3)      |
-| `DiscoveryProvider` | `FeedDiscoveryProvider` (RSS 2.0 / Atom)  | Allowlisted feeds only       |
-| `SecretStore`       | `EnvSecretStore` (local only)             | Implemented                  |
+| Interface           | Phase 1 implementation                                          | Status                                         |
+| ------------------- | --------------------------------------------------------------- | ---------------------------------------------- |
+| `PublisherAdapter`  | `SimulatedPublisher`                                            | Implemented, contract-tested                   |
+| `LlmProvider`       | `FakeLlmProvider`, `AnthropicLlmProvider`                       | Off by default, spend-gated                    |
+| `TtsProvider`       | `FakeTtsProvider` (tone per word, local), `DisabledTtsProvider` | No real adapter yet (owner to pick a provider) |
+| `DiscoveryProvider` | `FeedDiscoveryProvider` (RSS 2.0 / Atom)                        | Allowlisted feeds only                         |
+| `SecretStore`       | `EnvSecretStore` (local only)                                   | Implemented                                    |
 
 ## LLM (Phase 2)
 
@@ -61,3 +61,18 @@ written, and recorded in the adapter's `capabilities.verifiedAgainstDocsAt` and 
 | YouTube Shorts  | Data API v3 `videos.insert`, scope `youtube.upload`, `status.publishAt`    | Yes             |
 | Instagram Reels | Content Publishing (container + publish), permissions depend on login type | Yes             |
 | TikTok          | Content Posting API Direct Post, `video.publish`, audit for public posts   | Yes             |
+
+## Text to speech (Phase 3, T22)
+
+`TtsProvider.synthesize({ text, locale, providerVoiceId })` returns encoded audio (WAV or MP3),
+its duration, the model and the cost. Before every call the worker checks the voice with
+`evaluateVoice` (approved, not revoked, license in force with commercial use, consent proof when
+it imitates a real person; rule 5), and billable calls go through the same spend gate as the LLM.
+
+- `TTS_PROVIDER=disabled` (default): renders are refused before any narration.
+- `TTS_PROVIDER=fake` (local only): a 220 Hz tone per word at 2.6 words/s, so the whole render
+  pipeline can be tested without a provider. It is obviously not a human voice.
+- No real provider adapter exists. Before adding one, check the provider's current official docs
+  for: commercial-use terms for the voices, data retention, Spanish (es-ES / es-419) quality, and
+  pricing; register each voice with its license in "Derechos" and have a rights reviewer approve
+  it.

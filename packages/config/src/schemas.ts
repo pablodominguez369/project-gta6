@@ -34,6 +34,8 @@ export const webServerEnvSchema = baseEnvSchema.extend(publicEnvSchema.shape).ex
  * mode is rejected and the worker refuses to start.
  */
 export const LLM_PROVIDERS = ["disabled", "fake", "anthropic"] as const;
+/** No real TTS adapter yet: the owner has not chosen a provider (see docs/connectors.md). */
+export const TTS_PROVIDERS = ["disabled", "fake"] as const;
 
 export const workerEnvSchema = baseEnvSchema
   .extend({
@@ -58,6 +60,11 @@ export const workerEnvSchema = baseEnvSchema
         "must be a secret reference like env://NAME",
       )
       .optional(),
+    /**
+     * Text to speech for renders. "disabled" (default): nothing is narrated. "fake": a tone per
+     * word, local only, so renders can be tested end to end without any provider.
+     */
+    TTS_PROVIDER: z.enum(TTS_PROVIDERS).default("disabled"),
   })
   .superRefine((env, ctx) => {
     if (env.LLM_PROVIDER === "anthropic" && !env.LLM_API_KEY_REF) {
@@ -72,6 +79,13 @@ export const workerEnvSchema = baseEnvSchema
         code: "custom",
         path: ["LLM_PROVIDER"],
         message: "the fake LLM is only allowed when APP_ENV=local",
+      });
+    }
+    if (env.TTS_PROVIDER === "fake" && env.APP_ENV !== "local") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["TTS_PROVIDER"],
+        message: "the fake TTS is only allowed when APP_ENV=local",
       });
     }
   });

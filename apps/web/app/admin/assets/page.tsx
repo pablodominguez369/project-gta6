@@ -1,5 +1,7 @@
 import {
   evaluateAssetRights,
+  evaluateVoice,
+  VOICE_ISSUE_MESSAGES,
   hasAnyRole,
   RIGHTS_ISSUE_MESSAGES,
   RIGHTS_STATUS_LABELS,
@@ -17,7 +19,7 @@ import {
 } from "@/lib/rights";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-import { createLicense, reviewAsset } from "./actions";
+import { createLicense, createVoice, decideVoice, reviewAsset } from "./actions";
 import { AssetUploadForm } from "./upload-form";
 
 const toDate = (value: string | null): Date | null => (value ? new Date(value) : null);
@@ -27,7 +29,7 @@ export default async function AssetsPage() {
   const canUpload = hasAnyRole(user.roles, ["admin", "editor", "rights_reviewer"]);
   const canReview = hasAnyRole(user.roles, ["admin", "rights_reviewer"]);
   const supabase = await createSupabaseServerClient();
-  const [{ data: assets }, { data: licenses }] = await Promise.all([
+  const [{ data: assets }, { data: licenses }, { data: voices }] = await Promise.all([
     supabase
       .from("assets")
       .select(
@@ -42,6 +44,12 @@ export default async function AssetsPage() {
       )
       .order("created_at", { ascending: false })
       .limit(200),
+    supabase
+      .from("voices")
+      .select(
+        "id, provider, provider_voice_id, display_name, locale, license_id, imitates_real_person, consent_proof_path, disclosure_required, approved_at, revoked_at",
+      )
+      .order("display_name"),
   ]);
   const licenseById = new Map((licenses ?? []).map((l) => [l.id, l]));
   const licenseOptions = [
@@ -174,6 +182,107 @@ export default async function AssetsPage() {
           ))}
         </ul>
       </div>
+
+      <div>
+        <h2 className="font-medium">Voces sintéticas</h2>
+        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+          Solo se narra con voces aprobadas, con licencia en vigor que permita uso comercial. Nunca
+          se usa una voz que imite a una persona real sin su consentimiento. Los vídeos avisan de
+          que la voz es sintética.
+        </p>
+        <ul className="mt-2 flex flex-col gap-2 text-sm" data-testid="voices">
+          {(voices ?? []).map((voice) => {
+            const license = voice.license_id ? licenseById.get(voice.license_id) : undefined;
+            const check = evaluateVoice(
+              {
+                id: voice.id,
+                provider: voice.provider,
+                approved: voice.approved_at !== null,
+                revoked: voice.revoked_at !== null,
+                imitatesRealPerson: voice.imitates_real_person,
+                hasConsentProof: voice.consent_proof_path !== null,
+                license: license
+                  ? {
+                      id: license.id,
+                      allowedPlatforms: license.allowed_platforms,
+                      commercialAllowed: license.commercial_allowed,
+                      validFrom: toDate(license.valid_from),
+                      expiresAt: toDate(license.expires_at),
+                    }
+                  : null,
+              },
+              now,
+            );
+            return (
+              <li
+                key={voice.id}
+                className="flex flex-wrap items-center gap-3"
+                data-testid={`voice-${voice.id}`}
+              >
+                <span>
+                  <strong>{voice.display_name}</strong> · {voice.provider}/{voice.provider_voice_id}{" "}
+                  · {voice.locale}
+                  {license ? ` · Licencia: ${license.licensor}` : ""} ·{" "}
+                  {check.usable ? (
+                    <span className="text-green-700 dark:text-green-400">Se puede usar</span>
+                  ) : (
+                    <span className="text-red-600">
+                      {check.issues.map((i) => VOICE_ISSUE_MESSAGES[i]).join(" ")}
+                    </span>
+                  )}
+                </span>
+                {canReview ? (
+                  <ActionForm
+                    action={decideVoice}
+                    submitLabel={voice.approved_at && !voice.revoked_at ? "Retirar" : "Aprobar"}
+                    tone={voice.approved_at && !voice.revoked_at ? "danger" : "default"}
+                  >
+                    <input type="hidden" name="voiceId" value={voice.id} />
+                    <input
+                      type="hidden"
+                      name="decision"
+                      value={voice.approved_at && !voice.revoked_at ? "revoke" : "approve"}
+                    />
+                  </ActionForm>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      {canReview ? (
+        <div className="rounded border border-neutral-200 p-4 dark:border-neutral-800">
+          <h2 className="mb-3 font-medium">Nueva voz</h2>
+          <ActionForm action={createVoice} submitLabel="Guardar voz" testId="new-voice">
+            <Field label="Proveedor (en minúsculas; «fake» es la voz de prueba)">
+              <TextInput name="provider" required maxLength={50} />
+            </Field>
+            <Field label="Identificador de la voz en el proveedor">
+              <TextInput name="providerVoiceId" required maxLength={200} />
+            </Field>
+            <Field label="Nombre">
+              <TextInput name="displayName" required maxLength={100} />
+            </Field>
+            <Field label="Idioma">
+              <Select
+                name="locale"
+                options={[
+                  { value: "es-ES", label: "Español de España" },
+                  { value: "es-419", label: "Español latinoamericano" },
+                ]}
+              />
+            </Field>
+            <Field label="Licencia de la voz">
+              <Select name="licenseId" options={licenseOptions} />
+            </Field>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="imitatesRealPerson" />
+              Imita la voz de una persona real
+            </label>
+          </ActionForm>
+        </div>
+      ) : null}
 
       {canReview ? (
         <div className="rounded border border-neutral-200 p-4 dark:border-neutral-800">
