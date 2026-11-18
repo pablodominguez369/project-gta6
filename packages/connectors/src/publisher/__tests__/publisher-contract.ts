@@ -28,6 +28,7 @@ export function sampleRequest(overrides: Partial<PublishRequest> = {}): PublishR
     syntheticMedia: false,
     scheduledAt: null,
     visibility: "private",
+    visibilityConfirmed: true,
     ...overrides,
   };
 }

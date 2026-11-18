@@ -8,6 +8,7 @@ import {
   loadOAuthProvider,
   SimulatedPublisher,
   VaultSecretStore,
+  TikTokPublisher,
   YouTubePublisher,
   type LlmProvider,
   type SecretStore,
@@ -96,6 +97,7 @@ export async function startWorker(source: NodeJS.ProcessEnv = process.env): Prom
   );
   const renders = new SupabaseMediaStore(db);
   const youtube = new YouTubePublisher({ tokens: channelTokens, media: renders });
+  const tiktok = new TikTokPublisher({ tokens: channelTokens, media: renders });
   await queue.work(
     QUEUES.publishSimulated.name,
     trackJobRuns(
@@ -104,7 +106,7 @@ export async function startWorker(source: NodeJS.ProcessEnv = process.env): Prom
       createPublishHandler(
         {
           store: new PgPublicationStore(pool),
-          publishers: { simulated: publisher, youtube },
+          publishers: { simulated: publisher, youtube, tiktok },
           publishingMode: env.PUBLISHING_MODE,
         },
         QUEUES.publishSimulated,

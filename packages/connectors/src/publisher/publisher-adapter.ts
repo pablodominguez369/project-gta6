@@ -30,6 +30,8 @@ export const publishRequestSchema = z.object({
   scheduledAt: z.iso.datetime().nullable(),
   /** Phase 4 only uploads privately (ADR 0005); "public" does not exist in this schema. */
   visibility: z.literal("private"),
+  /** A person chose the visibility for this post when queuing it (required by TikTok). */
+  visibilityConfirmed: z.boolean(),
 });
 
 export type PublishRequest = z.infer<typeof publishRequestSchema>;

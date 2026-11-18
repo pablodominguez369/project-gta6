@@ -15,6 +15,8 @@ const enqueueInputSchema = z.object({
   idempotencyKey: z.string().regex(/^pub_[0-9a-f-]{36}$/),
   // Empty = text-only simulation (only allowed on the simulator).
   renderId: z.union([z.literal(""), z.uuid()]),
+  // Chosen by the person, no default (TikTok UX rules). Only "private" exists in Phase 4.
+  visibility: z.union([z.literal(""), z.literal("private")]),
 });
 
 /** Placeholder media for simulated publications without a video. */
@@ -33,6 +35,7 @@ export async function enqueueSimulatedPublication(
     channelId: formData.get("channelId"),
     idempotencyKey: formData.get("idempotencyKey"),
     renderId: formData.get("renderId") ?? "",
+    visibility: formData.get("visibility") ?? "",
   });
   if (!input.success) return actionError("Revisa el canal y el vídeo.");
 
@@ -54,6 +57,7 @@ export async function enqueueSimulatedPublication(
     mediaRef: render?.storage_path ?? SIMULATED_MEDIA_REF,
     // Declared to the platform whenever the video has a synthetic voice (rule 5).
     syntheticMedia: render?.disclosure_required ?? false,
+    visibilityConfirmed: input.data.visibility === "private",
   });
   if (!payload.success) {
     return actionError("Revisa el canal y el título (1 a 100 caracteres).");
@@ -75,6 +79,9 @@ export async function enqueueSimulatedPublication(
   }
   if (channel.platform !== "simulated" && !render) {
     return actionError("Para una plataforma real hay que elegir un vídeo.");
+  }
+  if (channel.platform !== "simulated" && input.data.visibility !== "private") {
+    return actionError("Elige la visibilidad de la publicación.");
   }
 
   const { error } = await supabase.from("publications").insert({
