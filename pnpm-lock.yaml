@@ -44,6 +44,9 @@ importers:
       '@gta6/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@gta6/connectors':
+        specifier: workspace:*
+        version: link:../../packages/connectors
       '@gta6/db':
         specifier: workspace:*
         version: link:../../packages/db

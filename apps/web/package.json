@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@gta6/config": "workspace:*",
+    "@gta6/connectors": "workspace:*",
     "@gta6/db": "workspace:*",
     "@gta6/domain": "workspace:*",
     "@gta6/observability": "workspace:*",
