@@ -156,6 +156,24 @@ Daylight saving time is resolved with the IANA database, never with fixed offset
 - A local time that happens twice is proposed once, at its first occurrence. For example,
   02:00-02:59 on 2026-10-25 in Madrid.
 
+## Media factory (Phase 3)
+
+### Rights registry (T20)
+
+Every image, clip, music track, font or voice used in a video is an `asset` with an origin and a
+rights status (`packages/domain/src/rights.ts`, `evaluateAssetRights`). The check fails closed:
+
+- only `original` (own work or AI output with commercial rights) and `cleared` (with a license)
+  are usable; `unknown`, `requires_permission`, `restricted`, `expired` and `disputed` block;
+- own gameplay captures, official material and stock always need a license, even if marked
+  otherwise (a public trailer is not a license, rule 3);
+- a license must be in force at the time of use, cover the platform, and allow commercial use
+  (every channel is treated as commercial).
+
+The render worker runs the check before rendering, and the publisher runs it again before
+publishing, with fresh data, so a license that expires or an asset that gets disputed in
+between still blocks.
+
 ## Decisions
 
 - [ADR 0001](adr/0001-monolith-nextjs-supabase.md): Next.js + Supabase modular monolith

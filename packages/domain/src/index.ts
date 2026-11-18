@@ -10,3 +10,4 @@ export * from "./roles";
 export * from "./script";
 export * from "./source-normalization";
 export * from "./spend";
+export * from "./rights";

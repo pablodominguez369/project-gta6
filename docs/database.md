@@ -39,6 +39,14 @@ Rules enforced in SQL:
 - A script reaches `approved`, `rejected` or `changes_requested` only through an `approvals` row
   by someone other than its author, and only while it is `in_review`. Approvals are append-only.
 - `created_by` on claims and scripts cannot be changed after insert.
+- Rights registry (Phase 3): an asset is `original` only when its origin is `original_work` or
+  `ai_generated`; `cleared` needs a license; both need a reviewer. Only `rights_reviewer` or
+  `admin` change `rights_status` or `license_id`; editors' new assets start as `unknown`, or
+  `requires_permission` for own captures, official material and stock. An asset's file, hash,
+  kind and origin are immutable. Assets and licenses are audited and never deleted by clients.
+- Storage bucket `media` is private (200 MB, allowed types only). Clients upload to `assets/`
+  (editors, reviewers) and `licenses/` (reviewers) and cannot overwrite or delete; renders are
+  written by the worker.
 - Spend limits default to `0` and only an admin can change them.
 - The last admin cannot be removed (role delete or user delete is rejected).
 - `audit_events` rejects UPDATE, DELETE and TRUNCATE for every role, including `service_role`.
