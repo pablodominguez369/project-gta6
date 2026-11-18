@@ -167,6 +167,27 @@ export interface AssOptions {
   readonly disclosure: string | null;
   /** Own brand text (never another platform's watermark). */
   readonly brand: string;
+  /** Lines of the closing card (credits, independence notice), shown after the last scene. */
+  readonly endCard?: readonly string[];
+}
+
+/** Length of the closing card with credits and the independence notice. */
+export const END_CARD_MS = 2500;
+
+/** Always on the closing card: the channel is not affiliated with the game's owner (spec 8). */
+export const INDEPENDENCE_NOTICE = "Canal editorial independiente, sin afiliación oficial.";
+
+/** Closing card: the notice, then each distinct attribution, wrapped to fit the safe area. */
+export function buildEndCard(attributions: readonly string[]): string[] {
+  const credits = [...new Set(attributions.map((a) => a.trim()).filter((a) => a.length > 0))];
+  return [INDEPENDENCE_NOTICE, ...(credits.length > 0 ? ["Créditos:", ...credits] : [])].flatMap(
+    (line) => wrapText(line, CAPTION_MAX_CHARS_PER_LINE + 8),
+  );
+}
+
+/** Total video length including the closing card. */
+export function videoDurationMs(storyboard: Storyboard): number {
+  return storyboard.totalMs + END_CARD_MS;
 }
 
 /**
@@ -189,12 +210,13 @@ export function buildAss(storyboard: Storyboard, options: AssOptions): string {
     `Style: Caption,${options.font},${String(CAPTION_FONT_SIZE)},&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,0,2,${String(marginH)},${String(marginH)},${String(captionMarginV)},1`,
     `Style: Headline,${options.font},${String(HEADLINE_FONT_SIZE)},&H0000E5FF,&H0000E5FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,6,0,8,${String(marginH)},${String(marginH)},${String(SAFE_AREA.top + 120)},1`,
     `Style: Small,${options.font},40,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3,0,8,${String(marginH)},${String(marginH)},${String(SAFE_AREA.top)},1`,
+    `Style: Card,${options.font},44,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3,0,5,${String(marginH)},${String(marginH)},0,1`,
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
   ];
   const events: string[] = [];
-  const end = assTime(storyboard.totalMs);
+  const end = assTime(videoDurationMs(storyboard));
   const top = [options.brand, options.disclosure].filter(Boolean).join(" · ");
   if (top) events.push(`Dialogue: 2,${assTime(0)},${end},Small,,0,0,0,,${assText(top)}`);
   for (const scene of storyboard.scenes) {
@@ -212,6 +234,10 @@ export function buildAss(storyboard: Storyboard, options: AssOptions): string {
       `Dialogue: 0,${assTime(cue.startMs)},${assTime(cue.endMs)},Caption,,0,0,0,,${cue.lines.map(assText).join("\\N")}`,
     );
   }
+  const card = options.endCard ?? buildEndCard([]);
+  events.push(
+    `Dialogue: 1,${assTime(storyboard.totalMs)},${end},Card,,0,0,0,,${card.map(assText).join("\\N")}`,
+  );
   return `${[...header, ...events].join("\n")}\n`;
 }
 

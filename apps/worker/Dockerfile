@@ -19,6 +19,10 @@ RUN pnpm install --frozen-lockfile --prod --filter @gta6/worker...
 
 FROM base AS runtime
 ENV NODE_ENV=production
+# Renders: FFmpeg (with libass for subtitles) and the subtitle font.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/worker/node_modules ./apps/worker/node_modules
 COPY --from=deps /app/packages ./packages

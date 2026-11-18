@@ -17,6 +17,8 @@ export const ERROR_CODES = [
   "INTERNAL",
   /** The model provider declined the request (safety refusal). Not retried automatically. */
   "CONTENT_REFUSED",
+  /** A rights, voice or file-integrity check blocked the work (fail closed, rule 3/5). */
+  "RIGHTS_BLOCKED",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

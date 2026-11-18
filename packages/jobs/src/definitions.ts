@@ -41,6 +41,15 @@ export const QUEUES = {
     retryDelaySeconds: 60,
     expireInSeconds: 600,
   },
+  mediaRender: {
+    name: "media.render",
+    // One queued-or-active job per project (singletonKey = project id). No queue retries: the
+    // handler re-queues temporary problems itself, always through the spend gate.
+    policy: "exclusive",
+    retryLimit: 0,
+    retryDelaySeconds: 60,
+    expireInSeconds: 1200,
+  },
   systemPing: {
     name: "system.ping",
     policy: "standard",
@@ -69,3 +78,8 @@ export const scriptDraftPayloadSchema = z.object({
   requestId: z.uuid(),
 });
 export type ScriptDraftPayload = z.infer<typeof scriptDraftPayloadSchema>;
+
+export const mediaRenderPayloadSchema = z.object({
+  projectId: z.uuid(),
+});
+export type MediaRenderPayload = z.infer<typeof mediaRenderPayloadSchema>;

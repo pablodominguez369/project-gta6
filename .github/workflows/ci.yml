@@ -51,7 +51,9 @@ jobs:
       # Applies every migration from scratch, then runs the pgTAP suite in supabase/tests.
       - run: pnpm db:start
       - run: pnpm db:test
-      - name: Queue integration tests (pg-boss against local Postgres)
+      - name: FFmpeg and subtitle font for render tests
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core
+      - name: Job integration tests (queue, drafting and renders against local Postgres)
         run: pnpm --filter @gta6/jobs test:integration
       - name: Generated types match the migrations
         run: |

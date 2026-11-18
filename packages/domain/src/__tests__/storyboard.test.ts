@@ -8,7 +8,9 @@ import {
   CAPTION_MAX_CHARS_PER_LINE,
   CAPTION_MAX_LINES,
   estimateVoiceMs,
+  buildEndCard,
   findOverflowingText,
+  INDEPENDENCE_NOTICE,
   wrapText,
 } from "../storyboard";
 
@@ -116,6 +118,19 @@ describe("buildAss", () => {
     expect(ass).toContain("Headline,,0,0,0,,Titular");
     expect(ass).toContain("Caption,,0,0,0,,Texto \\\\b1inyectado");
     expect(ass).not.toContain("{\\b1}");
-    expect(ass).toContain("Dialogue: 2,0:00:00.00,0:00:02.50");
+    expect(ass).toContain("Dialogue: 2,0:00:00.00,0:00:05.00");
+    expect(ass).toContain(
+      `Dialogue: 1,0:00:02.50,0:00:05.00,Card,,0,0,0,,${INDEPENDENCE_NOTICE.slice(0, 10)}`,
+    );
+  });
+});
+
+describe("buildEndCard", () => {
+  it("always carries the independence notice and lists each attribution once", () => {
+    expect(buildEndCard([])).toEqual(buildEndCard([" ", ""]));
+    const card = buildEndCard(["Foto: Banco X", "Foto: Banco X", "Música: Y"]);
+    expect(card.join(" ")).toContain("independiente");
+    expect(card.filter((line) => line === "Foto: Banco X")).toHaveLength(1);
+    expect(card).toContain("Música: Y");
   });
 });
