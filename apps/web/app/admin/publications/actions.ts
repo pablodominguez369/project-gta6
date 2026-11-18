@@ -13,9 +13,11 @@ const enqueueInputSchema = z.object({
   channelId: z.uuid(),
   // Generated when the form is rendered, so a resubmitted form reuses it and cannot duplicate.
   idempotencyKey: z.string().regex(/^pub_[0-9a-f-]{36}$/),
+  // Empty = text-only simulation (only allowed on the simulator).
+  renderId: z.union([z.literal(""), z.uuid()]),
 });
 
-/** Placeholder media for simulated publications. Phase 1 has no render pipeline yet. */
+/** Placeholder media for simulated publications without a video. */
 const SIMULATED_MEDIA_REF = "simulated://media/placeholder";
 
 /**
@@ -30,17 +32,33 @@ export async function enqueueSimulatedPublication(
   const input = enqueueInputSchema.safeParse({
     channelId: formData.get("channelId"),
     idempotencyKey: formData.get("idempotencyKey"),
+    renderId: formData.get("renderId") ?? "",
   });
+  if (!input.success) return actionError("Revisa el canal y el vídeo.");
+
+  const supabase = await createSupabaseServerClient();
+  let render: { id: string; storage_path: string; disclosure_required: boolean } | null = null;
+  if (input.data.renderId) {
+    const { data } = await supabase
+      .from("renders")
+      .select("id, storage_path, disclosure_required")
+      .eq("id", input.data.renderId)
+      .eq("qc_passed", true)
+      .maybeSingle();
+    if (!data) return actionError("Ese vídeo no existe o no pasó el control técnico.");
+    render = data;
+  }
   const payload = publicationPayloadSchema.safeParse({
     title: formData.get("title"),
     description: formData.get("description") ?? "",
-    mediaRef: SIMULATED_MEDIA_REF,
+    mediaRef: render?.storage_path ?? SIMULATED_MEDIA_REF,
+    // Declared to the platform whenever the video has a synthetic voice (rule 5).
+    syntheticMedia: render?.disclosure_required ?? false,
   });
-  if (!input.success || !payload.success) {
+  if (!payload.success) {
     return actionError("Revisa el canal y el título (1 a 100 caracteres).");
   }
 
-  const supabase = await createSupabaseServerClient();
   const { data: channel } = await supabase
     .from("channels")
     .select("platform")
@@ -54,10 +72,14 @@ export async function enqueueSimulatedPublication(
     channel_id: input.data.channelId,
     idempotency_key: input.data.idempotencyKey,
     payload_json: payload.data,
+    render_id: render?.id ?? null,
     created_by: user.id,
   });
   if (error?.code === "23505") {
     return actionOk("Esta publicación ya estaba encolada.");
+  }
+  if (error?.code === "23514") {
+    return actionError("Ese vídeo no se puede publicar: no pasó el control técnico.");
   }
   if (error) {
     logger.error({ dbErrorCode: error.code }, "publication enqueue failed");

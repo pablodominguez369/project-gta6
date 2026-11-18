@@ -20,13 +20,20 @@ import {
   type ErrorCode,
   type Platform,
   type RightsAsset,
-  type RightsLicense,
   type RightsStatus,
 } from "@gta6/domain";
 import type pg from "pg";
 
 import { ffmpegVersion, measureRender, runProcess } from "./ffmpeg";
 import type { MediaStore } from "./media-store";
+import {
+  LICENSE_JSON,
+  toLicense,
+  toVoiceRecord,
+  VOICE_COLUMNS,
+  type LicenseJson,
+  type VoiceRow,
+} from "./rights-rows";
 import { buildRenderArgs, type PlanBackground } from "./render-plan";
 import { synthesizeWithSpendGate, type TtsGateDeps } from "./synthesize-with-spend-gate";
 
@@ -93,43 +100,7 @@ interface AssetRow {
   license: LicenseJson | null;
 }
 
-interface LicenseJson {
-  id: string;
-  allowed_platforms: Platform[];
-  commercial_allowed: boolean;
-  valid_from: string | null;
-  expires_at: string | null;
-}
-
-interface VoiceRow {
-  id: string;
-  provider: string;
-  provider_voice_id: string;
-  locale: "es-ES" | "es-419";
-  imitates_real_person: boolean;
-  consent_proof_path: string | null;
-  disclosure_required: boolean;
-  approved_at: string | null;
-  revoked_at: string | null;
-  license: LicenseJson | null;
-}
-
-const toLicense = (l: LicenseJson | null): RightsLicense | null =>
-  l
-    ? {
-        id: l.id,
-        allowedPlatforms: l.allowed_platforms,
-        commercialAllowed: l.commercial_allowed,
-        validFrom: l.valid_from ? new Date(l.valid_from) : null,
-        expiresAt: l.expires_at ? new Date(l.expires_at) : null,
-      }
-    : null;
-
 const sha256 = (data: Uint8Array): string => createHash("sha256").update(data).digest("hex");
-
-const LICENSE_JSON = `case when l.id is null then null else json_build_object(
-  'id', l.id, 'allowed_platforms', l.allowed_platforms, 'commercial_allowed', l.commercial_allowed,
-  'valid_from', l.valid_from, 'expires_at', l.expires_at) end`;
 
 /**
  * Renders one queued project. Safe to run twice for the same id: the project is claimed
@@ -223,27 +194,14 @@ export async function renderProject(deps: RenderDeps, projectId: string): Promis
   // 3. The voice (rule 5).
   if (!project.voice_id) return block("Falta elegir la voz.");
   const { rows: voices } = await pool.query<VoiceRow>(
-    `select v.id, v.provider, v.provider_voice_id, v.locale, v.imitates_real_person,
-            v.consent_proof_path, v.disclosure_required, v.approved_at, v.revoked_at,
-            ${LICENSE_JSON} as license
+    `select ${VOICE_COLUMNS}
        from public.voices v left join public.licenses l on l.id = v.license_id
       where v.id = $1`,
     [project.voice_id],
   );
   const voice = voices[0];
   if (!voice) return block("La voz ya no existe.");
-  const voiceCheck = evaluateVoice(
-    {
-      id: voice.id,
-      provider: voice.provider,
-      approved: voice.approved_at !== null,
-      revoked: voice.revoked_at !== null,
-      imitatesRealPerson: voice.imitates_real_person,
-      hasConsentProof: voice.consent_proof_path !== null,
-      license: toLicense(voice.license),
-    },
-    now(),
-  );
+  const voiceCheck = evaluateVoice(toVoiceRecord(voice), now());
   if (!voiceCheck.usable) {
     return block(`Voz: ${voiceCheck.issues.map((i) => VOICE_ISSUE_MESSAGES[i]).join(" ")}`);
   }

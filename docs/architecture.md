@@ -235,6 +235,25 @@ worker only.
 Only the master is rendered. Per-platform encodes wait until each platform's current upload specs
 are checked (rule 2, Phase 4). The worker image installs `ffmpeg` and `fonts-dejavu-core`.
 
+### Publishing gate for videos (T26)
+
+`publications.render_id` links a publication to the render it publishes (a trigger accepts only
+master renders that passed QC, and freezes the link once the publication is in progress). Before
+every new publish attempt, after any reconciliation so an existing post is never hidden,
+`evaluatePublicationMedia` re-checks with the registry as it is at that moment:
+
+- the render passed QC;
+- every asset in its manifest still exists and passes the rights gate for the channel's platform
+  and commercial use (licenses can expire or be disputed after the render);
+- the voice is still approved, not revoked and licensed;
+- a synthetic voice is declared in the payload (`syntheticMedia`, passed to the adapter so it can
+  set the platform's AI label).
+
+Any failure marks the publication `failed` with `RIGHTS_BLOCKED` and an audit event listing the
+issues; nothing reaches the platform. Real platforms always need a render; only the simulator
+accepts text-only publications. In the panel, "Publicaciones" offers renders that passed QC, and
+each video page lists what a failed QC asked for (T27).
+
 ## Decisions
 
 - [ADR 0001](adr/0001-monolith-nextjs-supabase.md): Next.js + Supabase modular monolith

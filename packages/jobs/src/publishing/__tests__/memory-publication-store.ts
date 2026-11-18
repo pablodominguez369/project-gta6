@@ -34,6 +34,7 @@ export class MemoryPublicationStore implements PublicationStore {
   platform: PublicationContext["channel"]["platform"] = "simulated";
   payload: unknown = { title: "Título", description: "", mediaRef: "simulated://media/1" };
   recentPublishedAt: Date[] = [];
+  media: PublicationContext["media"] = null;
   locked = false;
 
   constructor(
@@ -75,6 +76,7 @@ export class MemoryPublicationStore implements PublicationStore {
       },
       systemPaused: this.systemPaused,
       recentPublishedAt: this.recentPublishedAt,
+      media: this.media,
     });
   }
 

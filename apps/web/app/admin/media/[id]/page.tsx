@@ -3,9 +3,12 @@ import {
   estimateVoiceMs,
   findOverflowingText,
   hasAnyRole,
+  RENDER_QC_CODES,
+  RENDER_QC_MESSAGES,
   scriptDraftSchema,
 } from "@gta6/domain";
 import Link from "next/link";
+import { z } from "zod";
 import { notFound } from "next/navigation";
 
 import { ActionForm } from "@/components/action-form";
@@ -42,7 +45,7 @@ export default async function MediaProjectPage({
     loadUsableMedia(supabase),
     supabase
       .from("renders")
-      .select("id, version, profile, duration_ms, size_bytes, qc_passed, created_at")
+      .select("id, version, profile, duration_ms, size_bytes, qc_passed, qc_report, created_at")
       .eq("project_id", project.id)
       .order("version", { ascending: false })
       .order("profile"),
@@ -177,6 +180,13 @@ export default async function MediaProjectPage({
                 <a href={`/admin/media/renders/${render.id}/file`} className="underline">
                   Descargar
                 </a>
+                {render.qc_passed ? null : (
+                  <ul className="ml-4 list-disc text-red-600" data-testid={`qc-${render.id}`}>
+                    {failedQcMessages(render.qc_report).map((message) => (
+                      <li key={message}>{message}</li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>
@@ -184,4 +194,15 @@ export default async function MediaProjectPage({
       </div>
     </section>
   );
+}
+
+const qcReportSchema = z.object({
+  checks: z.array(z.object({ code: z.enum(RENDER_QC_CODES), ok: z.boolean() })),
+});
+
+/** What the technical QC asked for and did not get, in plain words. */
+function failedQcMessages(report: unknown): string[] {
+  const parsed = qcReportSchema.safeParse(report);
+  if (!parsed.success) return ["No se pudo leer el informe del control técnico."];
+  return parsed.data.checks.filter((check) => !check.ok).map((c) => RENDER_QC_MESSAGES[c.code]);
 }
