@@ -34,6 +34,7 @@ export class MemoryPublicationStore implements PublicationStore {
   platform: PublicationContext["channel"]["platform"] = "simulated";
   mode: PublicationContext["channel"]["mode"] = "draft";
   liveUploadsEnabled = false;
+  publicUploadsEnabled = false;
   credentialActive = false;
   checkpoint: PlatformCheckpoint | null = null;
   payload: unknown = { title: "Título", description: "", mediaRef: "simulated://media/1" };
@@ -77,6 +78,7 @@ export class MemoryPublicationStore implements PublicationStore {
         mode: this.mode,
         paused: this.channelPaused,
         liveUploadsEnabled: this.liveUploadsEnabled,
+        publicUploadsEnabled: this.publicUploadsEnabled,
         credentialActive: this.credentialActive,
         timezone: "Europe/Madrid",
         maxPostsPerDay: 5,

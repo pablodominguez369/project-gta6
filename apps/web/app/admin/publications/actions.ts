@@ -15,8 +15,9 @@ const enqueueInputSchema = z.object({
   idempotencyKey: z.string().regex(/^pub_[0-9a-f-]{36}$/),
   // Empty = text-only simulation (only allowed on the simulator).
   renderId: z.union([z.literal(""), z.uuid()]),
-  // Chosen by the person, no default (TikTok UX rules). Only "private" exists in Phase 4.
-  visibility: z.union([z.literal(""), z.literal("private")]),
+  // Chosen by the person for every post, no default (TikTok UX rules). "public" also needs the
+  // channel's public switch (ADR 0007).
+  visibility: z.union([z.literal(""), z.literal("private"), z.literal("public")]),
 });
 
 /** Placeholder media for simulated publications without a video. */
@@ -57,7 +58,8 @@ export async function enqueueSimulatedPublication(
     mediaRef: render?.storage_path ?? SIMULATED_MEDIA_REF,
     // Declared to the platform whenever the video has a synthetic voice (rule 5).
     syntheticMedia: render?.disclosure_required ?? false,
-    visibilityConfirmed: input.data.visibility === "private",
+    visibilityConfirmed: input.data.visibility !== "",
+    visibility: input.data.visibility === "public" ? "public" : "private",
   });
   if (!payload.success) {
     return actionError("Revisa el canal y el título (1 a 100 caracteres).");
@@ -65,7 +67,7 @@ export async function enqueueSimulatedPublication(
 
   const { data: channel } = await supabase
     .from("channels")
-    .select("platform, mode, live_uploads_enabled")
+    .select("platform, mode, live_uploads_enabled, public_uploads_enabled")
     .eq("id", input.data.channelId)
     .maybeSingle();
   if (!channel) return actionError("Ese canal no existe.");
@@ -80,8 +82,14 @@ export async function enqueueSimulatedPublication(
   if (channel.platform !== "simulated" && !render) {
     return actionError("Para una plataforma real hay que elegir un vídeo.");
   }
-  if (channel.platform !== "simulated" && input.data.visibility !== "private") {
+  if (channel.platform !== "simulated" && input.data.visibility === "") {
     return actionError("Elige la visibilidad de la publicación.");
+  }
+  if (
+    input.data.visibility === "public" &&
+    (channel.mode === "manual" || !channel.public_uploads_enabled)
+  ) {
+    return actionError("Este canal no tiene permitida la publicación pública.");
   }
 
   const { error } = await supabase.from("publications").insert({

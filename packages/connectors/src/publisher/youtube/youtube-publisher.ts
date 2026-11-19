@@ -28,7 +28,9 @@ const CATEGORY_GAMING = "20";
 
 export const YOUTUBE_CAPABILITIES: PublisherCapabilities = {
   directPublish: true,
-  // status.publishAt would make a private video PUBLIC at that time: never used in Phase 4.
+  // status.publishAt would make a private video public at a set time: not used; the worker only
+  // sends a post when it is due. Public posts need the channel's public switch (ADR 0007), and
+  // YouTube keeps uploads from unaudited API projects private anyway.
   scheduledPublish: false,
   reconcileByRequest: true,
   privateVisibility: true,

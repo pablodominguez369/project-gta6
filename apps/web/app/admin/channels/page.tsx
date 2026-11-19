@@ -11,6 +11,7 @@ import {
   disconnectChannelAccount,
   setChannelPause,
   setLiveUploads,
+  setPublicUploads,
 } from "./actions";
 
 /** Result of connecting an account, shown after the OAuth redirect. */
@@ -43,7 +44,7 @@ export default async function ChannelsPage({
     supabase
       .from("channels")
       .select(
-        "id, platform, display_name, mode, paused, paused_reason, timezone, max_posts_per_day, min_minutes_between_posts, live_uploads_enabled",
+        "id, platform, display_name, mode, paused, paused_reason, timezone, max_posts_per_day, min_minutes_between_posts, live_uploads_enabled, public_uploads_enabled",
       )
       .order("created_at", { ascending: true }),
     // Admins only (RLS); other roles get an empty list.
@@ -103,6 +104,7 @@ export default async function ChannelsPage({
                       platform={channel.platform}
                       credential={credentialOf.get(channel.id) ?? null}
                       liveUploadsEnabled={channel.live_uploads_enabled}
+                      publicUploadsEnabled={channel.public_uploads_enabled}
                     />
                   </td>
                 ) : null}
@@ -184,11 +186,13 @@ function AccountCell({
   platform,
   credential,
   liveUploadsEnabled,
+  publicUploadsEnabled,
 }: {
   readonly channelId: string;
   readonly platform: string;
   readonly credential: string | null;
   readonly liveUploadsEnabled: boolean;
+  readonly publicUploadsEnabled: boolean;
 }) {
   if (platform === "simulated") return <span>—</span>;
   if (platform === "instagram") {
@@ -225,6 +229,29 @@ function AccountCell({
               aria-label="Motivo para activar subidas"
               required
               minLength={3}
+            />
+          )}
+        </ActionForm>
+      ) : null}
+      {liveUploadsEnabled || publicUploadsEnabled ? (
+        <ActionForm
+          action={setPublicUploads}
+          submitLabel={
+            publicUploadsEnabled ? "Desactivar publicación pública" : "Permitir publicar en público"
+          }
+          tone={publicUploadsEnabled ? "danger" : "default"}
+        >
+          <input type="hidden" name="channelId" value={channelId} />
+          <input type="hidden" name="enabled" value={publicUploadsEnabled ? "false" : "true"} />
+          {publicUploadsEnabled ? (
+            <span className="text-xs">Publicación pública permitida</span>
+          ) : (
+            <TextInput
+              name="authorization"
+              placeholder="Autorización escrita del responsable (fecha y dónde)"
+              aria-label="Autorización para publicar en público"
+              required
+              minLength={10}
             />
           )}
         </ActionForm>

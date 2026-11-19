@@ -30,8 +30,14 @@ export const TIKTOK_MIN_CHUNK = 5 * 1024 * 1024;
 export const TIKTOK_CHUNK = 10 * 1024 * 1024;
 /** post_info.title (the caption) is limited to 2200 UTF-16 code units. */
 export const TIKTOK_MAX_CAPTION = 2200;
-/** Phase 4 only: the private level, which unaudited clients are restricted to anyway. */
+/** Private level; unaudited clients are restricted to it anyway. */
 const PRIVATE_LEVEL = "SELF_ONLY";
+/** Public level (ADR 0007). Only accepted by TikTok once the app has passed its audit. */
+const PUBLIC_LEVEL = "PUBLIC_TO_EVERYONE";
+
+export function tiktokPrivacyLevel(visibility: PublishRequest["visibility"]): string {
+  return visibility === "public" ? PUBLIC_LEVEL : PRIVATE_LEVEL;
+}
 
 export const TIKTOK_CAPABILITIES: PublisherCapabilities = {
   directPublish: true,
@@ -110,8 +116,8 @@ function statusOf(status: string): ExternalStatus {
 }
 
 /**
- * TikTok Content Posting API, Direct Post (T33). Only SELF_ONLY, chosen explicitly by the
- * operator when queuing (TikTok's UX rules); comments, duet and stitch off; `is_aigc` from the
+ * TikTok Content Posting API, Direct Post (T33). SELF_ONLY or, once the channel allows it,
+ * PUBLIC_TO_EVERYONE, chosen explicitly by the operator for each post (TikTok's UX rules); comments, duet and stitch off; `is_aigc` from the
  * render. The publish_id is saved as checkpoint before any byte is sent, and reconciliation
  * asks its status: PUBLISH_COMPLETE/SEND_TO_USER_INBOX = exists, FAILED = safe to post again,
  * anything still in progress = unknown (never "not found", so nothing is posted twice).
@@ -158,11 +164,14 @@ export class TikTokPublisher implements PublisherAdapter {
       return err(new DomainError("VALIDATION_FAILED", "Video file missing or too large"));
     }
 
-    // 1. The creator's allowed privacy levels must include the private one.
+    // 1. The creator's allowed privacy levels must include the chosen one.
+    const level = tiktokPrivacyLevel(request.visibility);
     const info = await this.call(TIKTOK_CREATOR_INFO_URL, token, {}, creatorInfoSchema);
     if (!info.ok) return info;
-    if (!info.value.privacy_level_options.includes(PRIVATE_LEVEL)) {
-      return err(new DomainError("FORBIDDEN", "The account does not allow private posts"));
+    if (!info.value.privacy_level_options.includes(level)) {
+      return err(
+        new DomainError("FORBIDDEN", `The account does not allow ${request.visibility} posts`),
+      );
     }
 
     // 2. Init. No post exists until the whole file is uploaded.
@@ -173,7 +182,7 @@ export class TikTokPublisher implements PublisherAdapter {
       {
         post_info: {
           title: captionOf(request),
-          privacy_level: PRIVATE_LEVEL,
+          privacy_level: level,
           disable_comment: true,
           disable_duet: true,
           disable_stitch: true,

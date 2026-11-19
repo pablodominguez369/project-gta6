@@ -36,6 +36,8 @@ export interface PublicationContext {
     readonly mode: ChannelMode;
     readonly paused: boolean;
     readonly liveUploadsEnabled: boolean;
+    /** Admin switch for public posts (ADR 0007). */
+    readonly publicUploadsEnabled: boolean;
     /** An active credential reference that has not expired. */
     readonly credentialActive: boolean;
     readonly timezone: string;
@@ -103,6 +105,7 @@ interface ContextRow {
   mode: ChannelMode;
   paused: boolean;
   live_uploads_enabled: boolean;
+  public_uploads_enabled: boolean;
   credential_active: boolean;
   timezone: string;
   max_posts_per_day: number;
@@ -159,6 +162,7 @@ export class PgPublicationStore implements PublicationStore {
     const { rows } = await this.pool.query<ContextRow>(
       `select p.id, p.channel_id, p.status, p.idempotency_key, p.payload_json, p.reconcile_required,
               p.platform_checkpoint, c.platform, c.mode, c.paused, c.live_uploads_enabled,
+              c.public_uploads_enabled,
               exists (select 1 from public.credential_refs cr
                        where cr.channel_id = c.id and cr.status = 'active'
                          and (cr.expires_at is null or cr.expires_at > now()))
@@ -198,6 +202,7 @@ export class PgPublicationStore implements PublicationStore {
         mode: row.mode,
         paused: row.paused,
         liveUploadsEnabled: row.live_uploads_enabled,
+        publicUploadsEnabled: row.public_uploads_enabled,
         credentialActive: row.credential_active,
         timezone: row.timezone,
         maxPostsPerDay: row.max_posts_per_day,

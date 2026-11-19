@@ -105,6 +105,8 @@ async function attempt(
     liveUploadsEnabled: context.channel.liveUploadsEnabled,
     channelMode: context.channel.mode,
     credentialActive: context.channel.credentialActive,
+    visibility: requestedVisibility(context.publication.payload),
+    publicUploadsEnabled: context.channel.publicUploadsEnabled,
   });
   if (!gates.ok) {
     const code = gates.error.code;
@@ -120,7 +122,7 @@ async function attempt(
   // Manual channels never call a platform: they pass the same gates and wait for a person.
   const manual = context.channel.mode === "manual";
   const publisher = manual ? null : deps.publishers[context.channel.platform];
-  // Phase 4 only uploads privately; an adapter that cannot (Instagram) is never called.
+  // Every adapter must be able to upload privately; one that cannot (Instagram) is never called.
   if (
     !manual &&
     (publisher?.platform !== context.channel.platform || !publisher.capabilities.privateVisibility)
@@ -240,6 +242,12 @@ async function attempt(
   return { kind: "failed", code };
 }
 
+/** Visibility of the payload; anything unreadable counts as public so the gate stays strict. */
+function requestedVisibility(payload: unknown): "private" | "public" {
+  const parsed = publicationPayloadSchema.safeParse(payload);
+  return parsed.success ? parsed.data.visibility : "public";
+}
+
 function buildRequest(context: PublicationContext): PublishRequest | null {
   const payload = publicationPayloadSchema.safeParse(context.publication.payload);
   if (!payload.success) return null;
@@ -252,7 +260,7 @@ function buildRequest(context: PublicationContext): PublishRequest | null {
     syntheticMedia: payload.data.syntheticMedia,
     // The dispatcher only enqueues once scheduled_at has passed, so the post goes out now.
     scheduledAt: null,
-    visibility: "private",
+    visibility: payload.data.visibility,
     visibilityConfirmed: payload.data.visibilityConfirmed,
   };
 }

@@ -132,6 +132,66 @@ export async function setLiveUploads(
   );
 }
 
+const publicUploadsSchema = z.discriminatedUnion("enabled", [
+  z.object({ enabled: z.literal(true), authorization: z.string().trim().min(10).max(1000) }),
+  z.object({ enabled: z.literal(false) }),
+]);
+
+/**
+ * Admin switch for PUBLIC posts on one channel (ADR 0007). Switching on records where the
+ * owner's written authorization is, and needs real private uploads already on. Each post still
+ * asks for its visibility, and the worker re-checks this switch on every attempt.
+ */
+export async function setPublicUploads(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole(["admin"]);
+  const channelId = channelIdSchema.safeParse(formData.get("channelId"));
+  const parsed = publicUploadsSchema.safeParse({
+    enabled: formData.get("enabled") === "true",
+    authorization: formData.get("authorization") ?? undefined,
+  });
+  if (!channelId.success || !parsed.success) {
+    return actionError("Indica dónde y cuándo dio el responsable su autorización por escrito.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  if (parsed.data.enabled) {
+    const { data: channel } = await supabase
+      .from("channels")
+      .select("platform, live_uploads_enabled")
+      .eq("id", channelId.data)
+      .maybeSingle();
+    if (!channel || (channel.platform !== "youtube" && channel.platform !== "tiktok")) {
+      return actionError("Este canal no admite publicación pública automática.");
+    }
+    if (!channel.live_uploads_enabled) {
+      return actionError("Primero activa las subidas privadas de este canal.");
+    }
+  }
+
+  const { error } = await supabase
+    .from("channels")
+    .update(
+      parsed.data.enabled
+        ? { public_uploads_enabled: true, public_uploads_authorization: parsed.data.authorization }
+        : { public_uploads_enabled: false },
+    )
+    .eq("id", channelId.data);
+  if (error) {
+    logger.error({ dbErrorCode: error.code }, "public uploads update failed");
+    return actionError("No se pudo guardar el cambio.");
+  }
+  revalidatePath("/admin/channels");
+  revalidatePath("/admin/publications");
+  return actionOk(
+    parsed.data.enabled
+      ? "Publicación pública permitida. Cada publicación te pedirá elegir la visibilidad."
+      : "Publicación pública desactivada.",
+  );
+}
+
 /** Disconnects the channel's account: revokes its credentials, deletes the tokens from Vault. */
 export async function disconnectChannelAccount(
   _previous: ActionState,

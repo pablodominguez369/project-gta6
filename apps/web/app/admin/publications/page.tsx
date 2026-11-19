@@ -53,7 +53,7 @@ export default async function PublicationsPage() {
       .limit(50),
     supabase
       .from("channels")
-      .select("id, display_name, platform, mode, live_uploads_enabled")
+      .select("id, display_name, platform, mode, live_uploads_enabled, public_uploads_enabled")
       .order("created_at", { ascending: true }),
     supabase
       .from("renders")
@@ -70,13 +70,18 @@ export default async function PublicationsPage() {
       channel.platform === "simulated" || channel.mode === "manual" || channel.live_uploads_enabled,
   );
 
+  const publicChannels = usableChannels.filter(
+    (channel) => channel.public_uploads_enabled && channel.mode !== "manual",
+  );
+
   return (
     <section className="flex flex-col gap-6">
       <h1 className="text-xl font-semibold">Publicaciones</h1>
       <p className="text-sm text-neutral-600 dark:text-neutral-400">
-        Nada se publica en público. Los canales simulados no salen a ninguna plataforma; los canales
-        en modo manual preparan un paquete para que lo subas tú. Antes de cada intento se vuelven a
-        comprobar los derechos, la voz y el control técnico del vídeo.
+        Solo se publica en público cuando eliges «Público» en un canal que lo tiene permitido. Los
+        canales simulados no salen a ninguna plataforma; los canales en modo manual preparan un
+        paquete para que lo subas tú. Antes de cada intento se vuelven a comprobar los derechos, la
+        voz y el control técnico del vídeo.
       </p>
 
       {canEnqueue ? (
@@ -115,7 +120,17 @@ export default async function PublicationsPage() {
                 <Select
                   name="visibility"
                   placeholder="Elige la visibilidad"
-                  options={[{ value: "private", label: "Privado: solo la cuenta lo ve (Solo yo)" }]}
+                  options={[
+                    { value: "private", label: "Privado: solo la cuenta lo ve (Solo yo)" },
+                    ...(publicChannels.length > 0
+                      ? [
+                          {
+                            value: "public",
+                            label: `Público: lo ve todo el mundo (solo en ${publicChannels.map((c) => c.display_name).join(", ")})`,
+                          },
+                        ]
+                      : []),
+                  ]}
                 />
               </Field>
               <Field label="Título">
@@ -125,9 +140,9 @@ export default async function PublicationsPage() {
                 <TextInput name="description" maxLength={5000} />
               </Field>
               <p className="text-xs text-neutral-500">
-                Nada se publica en público. Si el canal es de TikTok: al publicar, aceptas la
-                Confirmación de uso de música de TikTok; los comentarios, dúos y stitch quedan
-                desactivados, y el vídeo puede tardar unos minutos en procesarse.
+                Si eliges «Público», el vídeo lo verá todo el mundo. Si el canal es de TikTok: al
+                publicar, aceptas la Confirmación de uso de música de TikTok; los comentarios, dúos
+                y stitch quedan desactivados, y el vídeo puede tardar unos minutos en procesarse.
               </p>
             </ActionForm>
           ) : (

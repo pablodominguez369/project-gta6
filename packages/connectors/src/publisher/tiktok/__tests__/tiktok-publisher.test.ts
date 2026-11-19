@@ -50,6 +50,15 @@ describe("TikTokPublisher", () => {
     });
   });
 
+  // ADR 0007: public posts only reach the adapter after every gate; TikTok then needs the level.
+  it("posts PUBLIC_TO_EVERYONE when the operator chose public", async () => {
+    const { tiktok, adapter } = setup();
+    const result = await adapter.publish(sampleRequest({ visibility: "public" }));
+    expect(result.ok).toBe(true);
+    const [post] = [...tiktok.posts.values()];
+    expect(post?.postInfo).toMatchObject({ privacy_level: "PUBLIC_TO_EVERYONE" });
+  });
+
   it("uploads a large file in ordered chunks", async () => {
     const big = new Uint8Array(23 * 1024 * 1024).fill(1);
     const { tiktok, adapter } = setup(big);

@@ -18,6 +18,8 @@ const openGates = {
   liveUploadsEnabled: false,
   channelMode: "draft",
   credentialActive: false,
+  visibility: "private" as const,
+  publicUploadsEnabled: false,
 };
 
 const liveYoutube = {
@@ -108,6 +110,25 @@ describe("evaluatePublishGates", () => {
     expect(canTransition("awaiting_manual", "succeeded")).toBe(true);
     expect(canTransition("awaiting_manual", "in_progress")).toBe(false);
     expect(isTerminal("awaiting_manual")).toBe(false);
+  });
+
+  // ADR 0007: a public post needs the channel's public switch on top of the three keys.
+  it("refuses a public post unless the channel allows public posts", () => {
+    const refused = evaluatePublishGates({ ...liveYoutube, visibility: "public" });
+    expect(!refused.ok && refused.error.code).toBe("FORBIDDEN");
+    const allowed = evaluatePublishGates({
+      ...liveYoutube,
+      visibility: "public",
+      publicUploadsEnabled: true,
+    });
+    expect(allowed.ok).toBe(true);
+    const noLive = evaluatePublishGates({
+      ...liveYoutube,
+      visibility: "public",
+      publicUploadsEnabled: true,
+      liveUploadsEnabled: false,
+    });
+    expect(!noLive.ok && noLive.error.code).toBe("FORBIDDEN");
   });
 
   it("pauses win over everything, even in live mode", () => {
