@@ -161,6 +161,48 @@ function assText(text: string): string {
   return text.replace(/\\/g, "\\\\").replace(/[{}]/g, "");
 }
 
+/** Caption fade-in, so each new caption appears smoothly instead of popping. */
+export const CAPTION_FADE_IN_MS = 80;
+/** Headline fade-in at the start of its scene. */
+export const HEADLINE_FADE_IN_MS = 150;
+
+/**
+ * Karaoke timing for one caption cue: each word gets a share of the cue proportional to its
+ * length, so the words light up roughly as they are spoken (ASS `\k` in centiseconds). The
+ * shares are rounded so they always add up to the cue length.
+ */
+export function karaokeWordTimings(
+  lines: readonly string[],
+  durationMs: number,
+): { word: string; lineBreakBefore: boolean; cs: number }[] {
+  const words = lines.flatMap((line, lineIndex) =>
+    line
+      .split(/\s+/)
+      .filter((w) => w.length > 0)
+      .map((word, wordIndex) => ({ word, lineBreakBefore: lineIndex > 0 && wordIndex === 0 })),
+  );
+  const totalCs = Math.max(0, Math.round(durationMs / 10));
+  const weights = words.map((w) => w.word.length + 1);
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+  let used = 0;
+  let weightSoFar = 0;
+  return words.map((w, i) => {
+    weightSoFar += weights[i] ?? 0;
+    const until = totalWeight > 0 ? Math.round((totalCs * weightSoFar) / totalWeight) : 0;
+    const cs = until - used;
+    used = until;
+    return { ...w, cs };
+  });
+}
+
+function karaokeText(cue: CaptionCue): string {
+  const parts = karaokeWordTimings(cue.lines, cue.endMs - cue.startMs).map(
+    (w, i) =>
+      `${i === 0 ? "" : w.lineBreakBefore ? "\\N" : " "}{\\k${String(w.cs)}}${assText(w.word)}`,
+  );
+  return `{\\fad(${String(CAPTION_FADE_IN_MS)},0)}${parts.join("")}`;
+}
+
 export interface AssOptions {
   readonly font: string;
   /** Text shown for the whole video at the top, e.g. "Voz generada con IA". */
@@ -191,8 +233,8 @@ export function videoDurationMs(storyboard: Storyboard): number {
 }
 
 /**
- * Subtitles in Advanced SubStation Alpha, rendered by FFmpeg/libass: captions, the per-scene
- * headline, the brand and the synthetic-voice disclosure, all inside the safe area.
+ * Subtitles in Advanced SubStation Alpha, rendered by FFmpeg/libass: karaoke captions (each
+ * word turns yellow as it is spoken), the per-scene headline, the brand and the synthetic-voice disclosure, all inside the safe area.
  */
 export function buildAss(storyboard: Storyboard, options: AssOptions): string {
   const marginH = SAFE_AREA.left;
@@ -207,7 +249,7 @@ export function buildAss(storyboard: Storyboard, options: AssOptions): string {
     "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    `Style: Caption,${options.font},${String(CAPTION_FONT_SIZE)},&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,0,2,${String(marginH)},${String(marginH)},${String(captionMarginV)},1`,
+    `Style: Caption,${options.font},${String(CAPTION_FONT_SIZE)},&H0000E5FF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,0,2,${String(marginH)},${String(marginH)},${String(captionMarginV)},1`,
     `Style: Headline,${options.font},${String(HEADLINE_FONT_SIZE)},&H0000E5FF,&H0000E5FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,6,0,8,${String(marginH)},${String(marginH)},${String(SAFE_AREA.top + 120)},1`,
     `Style: Small,${options.font},40,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3,0,8,${String(marginH)},${String(marginH)},${String(SAFE_AREA.top)},1`,
     `Style: Card,${options.font},44,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,3,0,5,${String(marginH)},${String(marginH)},0,1`,
@@ -226,12 +268,12 @@ export function buildAss(storyboard: Storyboard, options: AssOptions): string {
       .map(assText)
       .join("\\N");
     events.push(
-      `Dialogue: 1,${assTime(scene.startMs)},${assTime(scene.endMs)},Headline,,0,0,0,,${text}`,
+      `Dialogue: 1,${assTime(scene.startMs)},${assTime(scene.endMs)},Headline,,0,0,0,,{\\fad(${String(HEADLINE_FADE_IN_MS)},0)}${text}`,
     );
   }
   for (const cue of buildCaptions(storyboard)) {
     events.push(
-      `Dialogue: 0,${assTime(cue.startMs)},${assTime(cue.endMs)},Caption,,0,0,0,,${cue.lines.map(assText).join("\\N")}`,
+      `Dialogue: 0,${assTime(cue.startMs)},${assTime(cue.endMs)},Caption,,0,0,0,,${karaokeText(cue)}`,
     );
   }
   const card = options.endCard ?? buildEndCard([]);

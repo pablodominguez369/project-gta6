@@ -1,7 +1,7 @@
 import { buildStoryboard, scriptDraftSchema } from "@gta6/domain";
 import { describe, expect, it } from "vitest";
 
-import { buildRenderArgs } from "../render-plan";
+import { buildRenderArgs, panCrop } from "../render-plan";
 
 const draft = scriptDraftSchema.parse({
   lines: [
@@ -66,8 +66,24 @@ describe("buildRenderArgs", () => {
     expect(list).not.toContain("-loop");
     expect(list).not.toContain("lavfi");
     const graph = filterGraph(list);
-    expect(graph).toContain("[0:v]scale=1080:1920");
+    expect(graph).toContain("[0:v]scale=1188:2112");
     expect(graph).toContain("loop=loop=-1:size=1");
     expect(graph.match(/(^|;)color=c=0x1d3557:s=1080x1920:r=30:d=/g)).toHaveLength(2);
+  });
+
+  // A frozen photo looks cheap: still images are panned slowly across their scene.
+  it("pans still images inside an enlarged frame", () => {
+    const graph = filterGraph(args(null));
+    expect(graph).toContain("crop=1188:2112,setsar=1");
+    expect(graph).toContain(`${panCrop(0, "2.000")},trim=duration=2.000`);
+  });
+});
+
+describe("panCrop", () => {
+  it("alternates the pan direction from one scene to the next", () => {
+    expect(panCrop(0, "3.000")).toBe("crop=1080:1920:x='(iw-ow)*t/3.000':y='(ih-oh)*t/3.000'");
+    expect(panCrop(1, "3.000")).toBe(
+      "crop=1080:1920:x='(iw-ow)*(1-t/3.000)':y='(ih-oh)*(1-t/3.000)'",
+    );
   });
 });
