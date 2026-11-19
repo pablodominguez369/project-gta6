@@ -5,7 +5,9 @@ the URLs in `capabilities.verifiedAgainstDocsAt` / `docsUrls`. Re-check before e
 for real uploads, and whenever a platform announces a change. Anything not listed here is treated
 as unavailable (rule 2).
 
-Phase 4 never makes anything public: see [ADR 0005](adr/0005-live-publishing-gates.md).
+Phase 4 never made anything public: see [ADR 0005](adr/0005-live-publishing-gates.md). Public
+posts per channel, behind the owner's written authorization and the platforms' own audits, are
+described in [ADR 0007](adr/0007-public-posts.md).
 
 ## YouTube (Shorts)
 

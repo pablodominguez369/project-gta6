@@ -234,6 +234,7 @@ class CheckpointingFakeAdapter implements PublisherAdapter {
   readonly platform = "youtube" as const;
   readonly capabilities: PublisherCapabilities;
   readonly uploads: string[] = [];
+  readonly visibilities: string[] = [];
   reconciledWith: PlatformCheckpoint | null | undefined;
   private loseNextResponse: boolean;
 
@@ -255,6 +256,7 @@ class CheckpointingFakeAdapter implements PublisherAdapter {
   ): Promise<Result<ExternalPublication, DomainError>> {
     await context?.saveCheckpoint({ uploadId: `up-${request.idempotencyKey}` });
     this.uploads.push(request.idempotencyKey);
+    this.visibilities.push(request.visibility);
     if (this.loseNextResponse) {
       this.loseNextResponse = false;
       return err(new DomainError("AMBIGUOUS_EXTERNAL_STATE", "lost"));
@@ -329,6 +331,32 @@ describe("processPublication on real platforms (ADR 0005)", () => {
     expect([...off.uploads, ...noCredential.uploads]).toEqual([]);
   });
 
+  // ADR 0007: a public payload alone never publishes publicly; the channel switch is re-checked.
+  it("refuses a public post unless the channel allows public posts", async () => {
+    const adapter = new CheckpointingFakeAdapter();
+    const { store, run } = liveSetup(adapter);
+    store.payload = {
+      ...(store.payload as object),
+      visibility: "public",
+      visibilityConfirmed: true,
+    };
+    expect(await run(1)).toEqual({ kind: "failed", code: "FORBIDDEN" });
+    expect(adapter.uploads).toEqual([]);
+  });
+
+  it("sends a public post once the channel allows it", async () => {
+    const adapter = new CheckpointingFakeAdapter();
+    const { store, run } = liveSetup(adapter);
+    store.publicUploadsEnabled = true;
+    store.payload = {
+      ...(store.payload as object),
+      visibility: "public",
+      visibilityConfirmed: true,
+    };
+    expect((await run(1)).kind).toBe("succeeded");
+    expect(adapter.visibilities).toEqual(["public"]);
+  });
+
   it("refuses a platform without an adapter", async () => {
     const { store } = liveSetup(new CheckpointingFakeAdapter());
     store.platform = "tiktok";
@@ -340,7 +368,7 @@ describe("processPublication on real platforms (ADR 0005)", () => {
     expect(store.audit.map((event) => event.action)).toEqual(["publications.platform_refused"]);
   });
 
-  it("refuses an adapter that cannot upload privately (no public posts in Phase 4)", async () => {
+  it("refuses an adapter that cannot upload privately", async () => {
     const adapter = new CheckpointingFakeAdapter({ privateVisibility: false });
     const { run } = liveSetup(adapter);
     expect(await run(1)).toEqual({ kind: "failed", code: "FORBIDDEN" });

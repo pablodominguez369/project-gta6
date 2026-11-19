@@ -28,8 +28,8 @@ export const publishRequestSchema = z.object({
   /** The video contains synthetic media (AI voice); adapters set the platform's AI label. */
   syntheticMedia: z.boolean(),
   scheduledAt: z.iso.datetime().nullable(),
-  /** Phase 4 only uploads privately (ADR 0005); "public" does not exist in this schema. */
-  visibility: z.literal("private"),
+  /** Private by default; "public" only reaches an adapter once every gate passed (ADR 0007). */
+  visibility: z.enum(["private", "public"]),
   /** A person chose the visibility for this post when queuing it (required by TikTok). */
   visibilityConfirmed: z.boolean(),
 });

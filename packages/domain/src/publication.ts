@@ -48,10 +48,15 @@ export const publicationPayloadSchema = z.object({
   /** Declared to the platform when the video uses a synthetic voice (rule 5). */
   syntheticMedia: z.boolean().default(false),
   /**
-   * The person queuing chose the (private) visibility explicitly. TikTok's UX rules require it
-   * for every post, with no default; the TikTok adapter refuses a request without it.
+   * The person queuing chose the visibility explicitly. TikTok's UX rules require it for every
+   * post, with no default; the TikTok adapter refuses a request without it.
    */
   visibilityConfirmed: z.boolean().default(false),
+  /**
+   * Chosen per post. "public" also needs the channel's public switch (ADR 0007), re-checked by
+   * the worker on every attempt, so a forged payload can never publish publicly on its own.
+   */
+  visibility: z.enum(["private", "public"]).default("private"),
 });
 export type PublicationPayload = z.infer<typeof publicationPayloadSchema>;
 
@@ -78,13 +83,17 @@ export interface GateInput {
   readonly channelMode: string;
   /** The channel has an active, unexpired credential reference. */
   readonly credentialActive: boolean;
+  /** Visibility requested for this post. */
+  readonly visibility: "private" | "public";
+  /** Channel switch for public posts, set by an admin with the owner's authorization (ADR 0007). */
+  readonly publicUploadsEnabled: boolean;
 }
 
 /**
  * Pre-publication gates, checked on every attempt (not only when enqueuing), so a pause applied
  * after a job was queued still stops it. A real platform needs three keys (ADR 0005): the
- * worker in live mode, the channel switch and an active credential. Visibility is enforced
- * separately: Phase 4 only uploads as private.
+ * worker in live mode, the channel switch and an active credential. A public post also needs
+ * the channel's public switch (ADR 0007).
  */
 export function evaluatePublishGates(input: GateInput): Result<true, DomainError> {
   if (input.systemPaused) {
@@ -104,6 +113,9 @@ export function evaluatePublishGates(input: GateInput): Result<true, DomainError
   }
   if (!input.credentialActive) {
     return err(new DomainError("CREDENTIAL_EXPIRED", "The channel has no active credential"));
+  }
+  if (input.visibility === "public" && !input.publicUploadsEnabled) {
+    return err(new DomainError("FORBIDDEN", "Public posts are not enabled for this channel"));
   }
   return ok(true);
 }

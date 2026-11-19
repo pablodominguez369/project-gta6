@@ -183,6 +183,8 @@ export type Database = {
           paused: boolean;
           paused_reason: string | null;
           platform: Database["public"]["Enums"]["platform"];
+          public_uploads_authorization: string | null;
+          public_uploads_enabled: boolean;
           timezone: string;
           updated_at: string;
           upload_visibility: Database["public"]["Enums"]["upload_visibility"];
@@ -201,6 +203,8 @@ export type Database = {
           paused?: boolean;
           paused_reason?: string | null;
           platform: Database["public"]["Enums"]["platform"];
+          public_uploads_authorization?: string | null;
+          public_uploads_enabled?: boolean;
           timezone?: string;
           updated_at?: string;
           upload_visibility?: Database["public"]["Enums"]["upload_visibility"];
@@ -218,6 +222,8 @@ export type Database = {
           paused?: boolean;
           paused_reason?: string | null;
           platform?: Database["public"]["Enums"]["platform"];
+          public_uploads_authorization?: string | null;
+          public_uploads_enabled?: boolean;
           timezone?: string;
           updated_at?: string;
           upload_visibility?: Database["public"]["Enums"]["upload_visibility"];
