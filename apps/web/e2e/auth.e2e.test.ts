@@ -39,6 +39,15 @@ describe("authentication and role guards", () => {
     await page.close();
   });
 
+  // Google's app verification needs a public homepage linking to the privacy policy.
+  it("shows the public home page with the privacy link to anonymous visitors", async () => {
+    const page = await browser.newPage();
+    await page.goto(`${baseUrl}/`);
+    expect(new URL(page.url()).pathname).toBe("/");
+    expect(await page.locator('a[href="/legal/privacy"]').count()).toBe(1);
+    await page.close();
+  });
+
   it("shows a generic error for wrong credentials", async () => {
     const page = await browser.newPage();
     await signIn(page, { email: editor.email, password: "wrong-password-123" });
