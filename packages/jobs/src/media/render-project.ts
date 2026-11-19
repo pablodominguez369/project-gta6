@@ -314,7 +314,10 @@ export async function renderProject(deps: RenderDeps, projectId: string): Promis
     });
     const run = await runProcess(deps.binaries.ffmpeg, args, { cwd: dir });
     if (run.code !== 0) {
-      log.error({ exitCode: run.code, stderrTail: run.stderr.slice(-500) }, "ffmpeg failed");
+      log.error(
+        { exitCode: run.code, signal: run.signal, stderrTail: run.stderr.slice(-500) },
+        "ffmpeg failed",
+      );
       return await fail("INTERNAL", "El montaje del vídeo ha fallado.");
     }
 
