@@ -50,4 +50,12 @@ describe("buildRenderArgs", () => {
     expect(inputs.indexOf("music.mp3")).toBe(5);
     expect(filterGraph(list)).toContain("[5:a]aresample=48000");
   });
+
+  // Containers report the host's CPUs; without a limit x264 ran out of memory on Railway.
+  it("limits encoder and filter threads", () => {
+    const list = args(null);
+    expect(list[list.indexOf("-threads") + 1]).toBe("2");
+    expect(list[list.indexOf("-filter_complex_threads") + 1]).toBe("2");
+    expect(list.indexOf("-filter_complex_threads")).toBeLessThan(list.indexOf("-i"));
+  });
 });

@@ -8,6 +8,8 @@ export const FFMPEG_TIMEOUT_MS = 10 * 60_000;
 
 export interface ProcessResult {
   readonly code: number;
+  /** Set when the process was killed (for example SIGKILL when it ran out of memory). */
+  readonly signal: string | null;
   readonly stdout: string;
   readonly stderr: string;
 }
@@ -33,7 +35,7 @@ export function runProcess(
       },
       (error, stdout, stderr) => {
         const code = error === null ? 0 : typeof error.code === "number" ? error.code : 1;
-        resolve({ code, stdout, stderr });
+        resolve({ code, signal: error?.signal ?? null, stdout, stderr });
       },
     );
   });

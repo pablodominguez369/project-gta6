@@ -5,6 +5,11 @@ export const BRAND_BACKGROUND = "0x1d3557";
 export const FPS = 30;
 /** Music sits well under the narration. */
 export const MUSIC_VOLUME = 0.12;
+/**
+ * Encoder threads. Containers often report the host's CPU count, and x264 would then keep dozens
+ * of 1080x1920 frames in flight: the worker on Railway was killed (out of memory) mid-render.
+ */
+export const ENCODER_THREADS = 2;
 /** Common loudness target for mobile platforms; verify per platform before Phase 4. */
 export const LOUDNESS_LUFS = -14;
 
@@ -36,7 +41,13 @@ const seconds = (ms: number): string => (ms / 1000).toFixed(3);
  */
 export function buildRenderArgs(input: RenderPlanInput): string[] {
   const { storyboard } = input;
-  const args: string[] = ["-hide_banner", "-nostats", "-y"];
+  const args: string[] = [
+    "-hide_banner",
+    "-nostats",
+    "-y",
+    "-filter_complex_threads",
+    String(ENCODER_THREADS),
+  ];
   const segments = [
     ...storyboard.scenes.map((scene, index) => ({
       durationMs: scene.endMs - scene.startMs,
@@ -125,7 +136,11 @@ export function buildRenderArgs(input: RenderPlanInput): string[] {
     "-c:v",
     "libx264",
     "-preset",
-    "medium",
+    "veryfast",
+    "-threads",
+    String(ENCODER_THREADS),
+    "-rc-lookahead",
+    "20",
     "-crf",
     "20",
     "-profile:v",
