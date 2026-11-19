@@ -38,6 +38,24 @@ export default function PrivacyPage() {
         Al desconectar la cuenta desde el panel se borran sus permisos guardados. También puedes
         retirar el acceso desde los ajustes de seguridad de YouTube o TikTok.
       </p>
+      <section
+        lang="en"
+        className="space-y-2 border-t border-neutral-200 pt-4 dark:border-neutral-800"
+      >
+        <h2 className="text-lg font-medium">Summary in English</h2>
+        <p>
+          GTA 6 Media Factory is a private internal tool. When its owner connects a YouTube or
+          TikTok account, it stores the access tokens the platform returns (encrypted in Supabase
+          Vault, never visible in the panel), the granted scopes, the connection date, and the ids
+          and status of uploaded videos so the same video is never uploaded twice. This data is used
+          only to upload the videos the owner approves and to check their status. It is not sold,
+          shared with third parties or used for advertising. Data is stored in Supabase (EU, Paris)
+          and the panel is served by Vercel. Disconnecting the account in the panel deletes its
+          stored tokens; access can also be revoked from the YouTube or TikTok security settings.
+          Use of information received from Google APIs adheres to the Google API Services User Data
+          Policy, including the Limited Use requirements.
+        </p>
+      </section>
     </main>
   );
 }
