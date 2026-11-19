@@ -1,10 +1,10 @@
 import {
   CompositeSecretStore,
   createLlmProvider,
+  createTtsProvider,
   DisabledLlmProvider,
   DisabledTtsProvider,
   EnvSecretStore,
-  FakeTtsProvider,
   loadOAuthProvider,
   SimulatedPublisher,
   VaultSecretStore,
@@ -148,7 +148,7 @@ export async function startWorker(source: NodeJS.ProcessEnv = process.env): Prom
 
   // Phase 3: renders. Rights, voice and file hashes are checked before anything is produced,
   // and narration goes through the same spend gate as the LLM.
-  const tts = buildTtsProvider(env, logger);
+  const tts = await buildTtsProvider(env, logger, secrets);
   await queue.work(
     QUEUES.mediaRender.name,
     trackJobRuns(
@@ -207,9 +207,20 @@ async function buildLlmProvider(
   return result.value;
 }
 
-/** Only the local fake exists today; anything else keeps narration off (safe block). */
-function buildTtsProvider(env: ReturnType<typeof loadWorkerEnv>, logger: Logger): TtsProvider {
-  const provider = env.TTS_PROVIDER === "fake" ? new FakeTtsProvider() : new DisabledTtsProvider();
-  logger.info({ ttsProvider: provider.name }, "TTS provider ready");
-  return provider;
+/** Falls back to the disabled provider on any configuration problem (safe block). */
+async function buildTtsProvider(
+  env: ReturnType<typeof loadWorkerEnv>,
+  logger: Logger,
+  secrets: SecretStore,
+): Promise<TtsProvider> {
+  const result = await createTtsProvider(
+    { provider: env.TTS_PROVIDER, credentialsRef: env.TTS_CREDENTIALS_REF },
+    secrets,
+  );
+  if (!result.ok) {
+    logger.error({ errorCode: result.error.code }, "TTS provider unavailable; narration disabled");
+    return new DisabledTtsProvider();
+  }
+  logger.info({ ttsProvider: result.value.name }, "TTS provider ready");
+  return result.value;
 }

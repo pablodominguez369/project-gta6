@@ -57,8 +57,8 @@ export const webServerEnvSchema = baseEnvSchema
  */
 export const PUBLISHING_MODES = ["simulated", "live"] as const;
 export const LLM_PROVIDERS = ["disabled", "fake", "anthropic"] as const;
-/** No real TTS adapter yet: the owner has not chosen a provider (see docs/connectors.md). */
-export const TTS_PROVIDERS = ["disabled", "fake"] as const;
+/** "google": Google Cloud Text-to-Speech, chosen by the owner on 2026-11-19 (docs/connectors.md). */
+export const TTS_PROVIDERS = ["disabled", "fake", "google"] as const;
 
 export const workerEnvSchema = baseEnvSchema
   .extend(platformOAuthEnvSchema.shape)
@@ -89,6 +89,11 @@ export const workerEnvSchema = baseEnvSchema
      * word, local only, so renders can be tested end to end without any provider.
      */
     TTS_PROVIDER: z.enum(TTS_PROVIDERS).default("disabled"),
+    /**
+     * Secret reference to the TTS credentials (Google: the service account JSON key, e.g.
+     * vault://<uuid>), never the credentials themselves. Required when TTS_PROVIDER=google.
+     */
+    TTS_CREDENTIALS_REF: secretRef.optional(),
     /** FFmpeg binaries for renders (installed in the worker image). */
     FFMPEG_PATH: z.string().min(1).default("ffmpeg"),
     FFPROBE_PATH: z.string().min(1).default("ffprobe"),
@@ -115,6 +120,13 @@ export const workerEnvSchema = baseEnvSchema
         code: "custom",
         path: ["PUBLISHING_MODE"],
         message: "live publishing is not allowed when APP_ENV=local (use simulated)",
+      });
+    }
+    if (env.TTS_PROVIDER === "google" && !env.TTS_CREDENTIALS_REF) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["TTS_CREDENTIALS_REF"],
+        message: "required when TTS_PROVIDER=google",
       });
     }
     if (env.TTS_PROVIDER === "fake" && env.APP_ENV !== "local") {
