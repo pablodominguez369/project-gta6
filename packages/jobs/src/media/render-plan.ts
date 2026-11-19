@@ -10,6 +10,12 @@ export const MUSIC_VOLUME = 0.12;
  * of 1080x1920 frames in flight: the worker on Railway was killed (out of memory) mid-render.
  */
 export const ENCODER_THREADS = 2;
+/**
+ * Still images are scaled this much larger than the frame and slowly panned across the scene
+ * (a "Ken Burns" move), so a photo never looks frozen. A moving crop is cheap, unlike a
+ * per-frame zoom, which matters on the worker's small CPU and memory budget.
+ */
+export const PAN_SCALE = 1.1;
 /** Common loudness target for mobile platforms; verify per platform before Phase 4. */
 export const LOUDNESS_LUFS = -14;
 
@@ -32,6 +38,18 @@ export interface RenderPlanInput {
 }
 
 const seconds = (ms: number): string => (ms / 1000).toFixed(3);
+
+/**
+ * Moving crop of a still image: diagonal pan over the scene's duration, alternating direction
+ * from one scene to the next. FFmpeg evaluates crop's x/y per frame and keeps them in bounds.
+ */
+export function panCrop(segmentIndex: number, durationSeconds: string): string {
+  const progress = segmentIndex % 2 === 0 ? `t/${durationSeconds}` : `(1-t/${durationSeconds})`;
+  return (
+    `crop=${String(FRAME.width)}:${String(FRAME.height)}:` +
+    `x='(iw-ow)*${progress}':y='(ih-oh)*${progress}'`
+  );
+}
 
 /**
  * FFmpeg arguments for the master render: one segment per scene plus the closing card, scaled
@@ -65,6 +83,11 @@ export function buildRenderArgs(input: RenderPlanInput): string[] {
   const fit =
     `scale=${String(FRAME.width)}:${String(FRAME.height)}:force_original_aspect_ratio=increase,` +
     `crop=${String(FRAME.width)}:${String(FRAME.height)},setsar=1`;
+  const panWidth = Math.round(FRAME.width * PAN_SCALE);
+  const panHeight = Math.round(FRAME.height * PAN_SCALE);
+  const panFit =
+    `scale=${String(panWidth)}:${String(panHeight)}:force_original_aspect_ratio=increase,` +
+    `crop=${String(panWidth)}:${String(panHeight)},setsar=1`;
   const filters: string[] = [];
   let nextInput = 0;
   segments.forEach((segment, i) => {
@@ -73,8 +96,8 @@ export function buildRenderArgs(input: RenderPlanInput): string[] {
     if (segment.background?.kind === "image") {
       args.push("-i", segment.background.file);
       filters.push(
-        `[${String(nextInput)}:v]${fit},format=yuv420p,loop=loop=-1:size=1,` +
-          `setpts=N/(${String(FPS)}*TB),fps=${String(FPS)},${out}`,
+        `[${String(nextInput)}:v]${panFit},format=yuv420p,loop=loop=-1:size=1,` +
+          `setpts=N/(${String(FPS)}*TB),fps=${String(FPS)},${panCrop(i, d)},${out}`,
       );
       nextInput += 1;
     } else if (segment.background?.kind === "video") {

@@ -4,6 +4,7 @@ import { scriptDraftSchema } from "../script";
 import {
   buildAss,
   buildCaptions,
+  karaokeWordTimings,
   buildStoryboard,
   CAPTION_MAX_CHARS_PER_LINE,
   CAPTION_MAX_LINES,
@@ -115,14 +116,47 @@ describe("buildAss", () => {
     });
     expect(ass).toContain("PlayResX: 1080");
     expect(ass).toContain("Small,,0,0,0,,Canal · Voz generada con IA");
-    expect(ass).toContain("Headline,,0,0,0,,Titular");
-    expect(ass).toContain("Caption,,0,0,0,,Texto \\\\b1inyectado");
+    expect(ass).toContain("Headline,,0,0,0,,{\\fad(150,0)}Titular");
+    expect(ass).toMatch(
+      /Caption,,0,0,0,,\{\\fad\(80,0\)\}\{\\k\d+\}Texto \{\\k\d+\}\\\\b1inyectado/,
+    );
     expect(ass).not.toContain("{\\b1}");
     expect(ass).toContain("Dialogue: 2,0:00:00.00,0:00:05.00");
     expect(ass).toContain(
       `Dialogue: 1,0:00:02.50,0:00:05.00,Card,,0,0,0,,${INDEPENDENCE_NOTICE.slice(0, 10)}`,
     );
   });
+});
+
+describe("karaokeWordTimings", () => {
+  it("splits the cue between words by length and always adds up to the cue", () => {
+    const timings = karaokeWordTimings(["Hola mundo", "otra"], 1234);
+    expect(timings.map((t) => t.word)).toEqual(["Hola", "mundo", "otra"]);
+    expect(timings.map((t) => t.lineBreakBefore)).toEqual([false, false, true]);
+    expect(timings.reduce((sum, t) => sum + t.cs, 0)).toBe(123);
+    expect(timings[1]?.cs).toBeGreaterThan(timings[0]?.cs ?? 0);
+  });
+
+  it("handles an empty cue", () => {
+    expect(karaokeWordTimings([], 1000)).toEqual([]);
+  });
+});
+
+it("highlights caption words as they are spoken and keeps line breaks", () => {
+  const draft = scriptDraftSchema.parse({
+    lines: [
+      { kind: "hook", voice: "Uno cuatro", on_screen: "" },
+      { kind: "cta", voice: "Fin", on_screen: "" },
+    ],
+  });
+  const ass = buildAss(buildStoryboard(draft, [1000, 500], []), {
+    font: "DejaVu Sans",
+    disclosure: null,
+    brand: "",
+  });
+  expect(ass).toContain("Caption,,0,0,0,,{\\fad(80,0)}{\\k36}Uno {\\k64}cuatro");
+  // Primary colour (already spoken) is yellow, secondary (not yet spoken) is white.
+  expect(ass).toMatch(/Style: Caption,DejaVu Sans,64,&H0000E5FF,&H00FFFFFF,/);
 });
 
 describe("buildEndCard", () => {
