@@ -1,7 +1,8 @@
 # Worker image. Build from the repository root:
 #   docker build -f apps/worker/Dockerfile -t gta6-worker .
 # Secrets are injected at runtime by the platform's secret manager, never baked into the image.
-FROM node:24-slim AS base
+# Debian 13 (trixie): FFmpeg 7.1, closer to the 6.1 used in CI than bookworm's 5.1.
+FROM node:24-trixie-slim AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 RUN corepack enable
 WORKDIR /app

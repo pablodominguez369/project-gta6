@@ -63,12 +63,13 @@ export function buildRenderArgs(input: RenderPlanInput): string[] {
       );
     }
   }
-  // Next inputs: one narration file per scene, then silence for the closing card.
+  // Next inputs: one narration file per scene, then the optional music. The closing card's
+  // silence is generated inside the filter graph: as a separate lavfi input, FFmpeg 5.1 (Debian
+  // 12) re-initialised the graph on its first frame and then failed to negotiate the channel
+  // layout of the AAC output ("Cannot select channel layout").
   const voiceBase = segments.length;
   for (const file of input.voiceFiles) args.push("-i", file);
-  const silenceIndex = voiceBase + input.voiceFiles.length;
-  args.push("-f", "lavfi", "-t", seconds(END_CARD_MS), "-i", "anullsrc=r=48000:cl=stereo");
-  const musicIndex = silenceIndex + 1;
+  const musicIndex = voiceBase + input.voiceFiles.length;
   if (input.musicFile) args.push("-stream_loop", "-1", "-i", input.musicFile);
 
   const filters: string[] = [];
@@ -90,7 +91,9 @@ export function buildRenderArgs(input: RenderPlanInput): string[] {
         `apad=whole_dur=${seconds(scene.endMs - scene.startMs)},atrim=duration=${seconds(scene.endMs - scene.startMs)},asetpts=PTS-STARTPTS[a${String(i)}]`,
     );
   });
-  filters.push(`[${String(silenceIndex)}:a]aformat=sample_fmts=fltp:channel_layouts=stereo[asil]`);
+  filters.push(
+    `anullsrc=r=48000:cl=stereo,atrim=duration=${seconds(END_CARD_MS)},aformat=sample_fmts=fltp:channel_layouts=stereo[asil]`,
+  );
   filters.push(
     `${storyboard.scenes.map((_, i) => `[a${String(i)}]`).join("")}[asil]concat=n=${String(storyboard.scenes.length + 1)}:v=0:a=1[voice]`,
   );
@@ -104,7 +107,12 @@ export function buildRenderArgs(input: RenderPlanInput): string[] {
   } else {
     filters.push("[voice]anull[mix]");
   }
-  filters.push(`[mix]loudnorm=I=${String(LOUDNESS_LUFS)}:TP=-1.5:LRA=11,aresample=48000[aout]`);
+  // The output format is pinned (rate, sample format and layout) so the encoder never has to
+  // negotiate it.
+  filters.push(
+    `[mix]loudnorm=I=${String(LOUDNESS_LUFS)}:TP=-1.5:LRA=11,aresample=48000,` +
+      `aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[aout]`,
+  );
 
   const totalMs = storyboard.totalMs + END_CARD_MS;
   args.push(
@@ -132,6 +140,8 @@ export function buildRenderArgs(input: RenderPlanInput): string[] {
     "192k",
     "-ar",
     "48000",
+    "-ac",
+    "2",
     "-movflags",
     "+faststart",
     "-t",
