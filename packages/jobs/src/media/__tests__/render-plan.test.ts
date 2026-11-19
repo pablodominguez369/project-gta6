@@ -45,10 +45,11 @@ describe("buildRenderArgs", () => {
 
   it("reads the music from the input right after the narration", () => {
     const list = args("music.mp3");
-    // 3 visual inputs (2 scenes + closing card) and 2 narration files: music is input 5.
+    // 1 image input (the other scene and the closing card use the brand colour) and 2 narration
+    // files: music is input 3.
     const inputs = list.flatMap((arg, i) => (arg === "-i" ? [list[i + 1]] : []));
-    expect(inputs.indexOf("music.mp3")).toBe(5);
-    expect(filterGraph(list)).toContain("[5:a]aresample=48000");
+    expect(inputs).toEqual(["bg.png", "voice_0.wav", "voice_1.wav", "music.mp3"]);
+    expect(filterGraph(list)).toContain("[3:a]aresample=48000");
   });
 
   // Containers report the host's CPUs; without a limit x264 ran out of memory on Railway.
@@ -57,5 +58,16 @@ describe("buildRenderArgs", () => {
     expect(list[list.indexOf("-threads") + 1]).toBe("2");
     expect(list[list.indexOf("-filter_complex_threads") + 1]).toBe("2");
     expect(list.indexOf("-filter_complex_threads")).toBeLessThan(list.indexOf("-i"));
+  });
+
+  // FFmpeg 7 queued every frame of later scenes in memory (SIGKILL on the worker).
+  it("reads images as one frame and generates colour and repeats inside the graph", () => {
+    const list = args(null);
+    expect(list).not.toContain("-loop");
+    expect(list).not.toContain("lavfi");
+    const graph = filterGraph(list);
+    expect(graph).toContain("[0:v]scale=1080:1920");
+    expect(graph).toContain("loop=loop=-1:size=1");
+    expect(graph.match(/(^|;)color=c=0x1d3557:s=1080x1920:r=30:d=/g)).toHaveLength(2);
   });
 });
