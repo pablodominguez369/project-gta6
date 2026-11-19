@@ -10,6 +10,8 @@ export * from "./llm/fake-llm-provider";
 export * from "./llm/create-llm-provider";
 export * from "./tts/fake-tts-provider";
 export * from "./tts/wav";
+export * from "./tts/google-tts-provider";
+export * from "./tts/create-tts-provider";
 export * from "./oauth/oauth-provider";
 export * from "./oauth/google-oauth-provider";
 export * from "./oauth/tiktok-oauth-provider";

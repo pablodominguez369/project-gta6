@@ -34,8 +34,26 @@ Production as set up on 2026-11-18. Nothing here makes a post public (ADR 0005).
 5. TikTok: unaudited apps can only post `SELF_ONLY`, and only to private accounts. The sandbox
    allows testing with up to 10 owned accounts without app review.
 
-## Worker
+## Worker (Railway)
 
-Not deployed yet. It needs a host that runs the Docker image in `apps/worker/Dockerfile` with
-`DATABASE_URL` (direct or session pooler), `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, the same OAuth
-variables, and `PUBLISHING_MODE=simulated` until the owner switches a channel on.
+- Railway service `@gta6/worker` from this repository, branch `main`, no root directory, built
+  from the Dockerfile via `RAILWAY_DOCKERFILE_PATH=apps/worker/Dockerfile`. Watch paths
+  `/apps/worker/**` and `/packages/**`. No public networking.
+- Variables: `APP_ENV=production`, `LOG_LEVEL`, `PUBLISHING_MODE=simulated` (until the owner
+  switches real private uploads on), `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `DATABASE_URL`
+  (Supavisor **session** pooler, port 5432: pg-boss needs session features), `APP_BASE_URL`, the
+  four OAuth variables, and for narration `TTS_PROVIDER=google` + `TTS_CREDENTIALS_REF`.
+- A database password with URL-special characters (`@ # / : ? %`) breaks `DATABASE_URL`; use
+  letters and digits or percent-encode it.
+
+## Google Text-to-Speech
+
+1. In the same Google Cloud project: enable "Cloud Text-to-Speech API" and billing (required even
+   for the free tier).
+2. IAM → Service accounts → create one. We found no role documented for `text:synthesize`, so start
+   with none and add one only if Google answers 403. Then Keys →
+   Add key → JSON. Paste the whole file content into Vault as `google_tts_service_account`.
+3. Railway: `TTS_PROVIDER=google`, `TTS_CREDENTIALS_REF=vault://<secret id>`.
+4. Panel: set a spend limit above 0 in Controles, register the license (Google terms, commercial
+   use confirmed by the owner) and the voice (`es-ES-Chirp3-HD-<Name>`, provider `google`), and
+   approve it.

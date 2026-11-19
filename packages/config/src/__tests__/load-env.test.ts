@@ -150,4 +150,17 @@ describe("loadEnv", () => {
     });
     expect(!fake.ok && fake.error.message).toContain("TTS_PROVIDER");
   });
+
+  it("requires a secret reference for Google TTS and refuses a raw credential", () => {
+    const base = { ...validWorkerEnv, APP_ENV: "production", TTS_PROVIDER: "google" };
+    const missing = loadEnv(workerEnvSchema, base);
+    expect(!missing.ok && missing.error.message).toContain("TTS_CREDENTIALS_REF");
+    const raw = loadEnv(workerEnvSchema, { ...base, TTS_CREDENTIALS_REF: '{"type":"x"}' });
+    expect(raw.ok).toBe(false);
+    const good = loadEnv(workerEnvSchema, {
+      ...base,
+      TTS_CREDENTIALS_REF: "vault://7d2acff3-fca8-47fc-a612-8c69fe098047",
+    });
+    expect(good.ok && good.value.TTS_PROVIDER).toBe("google");
+  });
 });

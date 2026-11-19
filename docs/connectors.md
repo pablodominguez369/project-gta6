@@ -3,13 +3,13 @@
 All external providers sit behind interfaces in `packages/connectors`. The domain never imports a
 vendor SDK directly.
 
-| Interface           | Phase 1 implementation                                          | Status                                         |
-| ------------------- | --------------------------------------------------------------- | ---------------------------------------------- |
-| `PublisherAdapter`  | `SimulatedPublisher`                                            | Implemented, contract-tested                   |
-| `LlmProvider`       | `FakeLlmProvider`, `AnthropicLlmProvider`                       | Off by default, spend-gated                    |
-| `TtsProvider`       | `FakeTtsProvider` (tone per word, local), `DisabledTtsProvider` | No real adapter yet (owner to pick a provider) |
-| `DiscoveryProvider` | `FeedDiscoveryProvider` (RSS 2.0 / Atom)                        | Allowlisted feeds only                         |
-| `SecretStore`       | `EnvSecretStore` (local only)                                   | Implemented                                    |
+| Interface           | Phase 1 implementation                                                               | Status                                   |
+| ------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------- |
+| `PublisherAdapter`  | `SimulatedPublisher`                                                                 | Implemented, contract-tested             |
+| `LlmProvider`       | `FakeLlmProvider`, `AnthropicLlmProvider`                                            | Off by default, spend-gated              |
+| `TtsProvider`       | `GoogleTtsProvider`, `FakeTtsProvider` (tone per word, local), `DisabledTtsProvider` | Google chosen by the owner on 2026-11-19 |
+| `DiscoveryProvider` | `FeedDiscoveryProvider` (RSS 2.0 / Atom)                                             | Allowlisted feeds only                   |
+| `SecretStore`       | `EnvSecretStore` (local only)                                                        | Implemented                              |
 
 ## LLM (Phase 2)
 
@@ -147,7 +147,27 @@ it imitates a real person; rule 5), and billable calls go through the same spend
 - `TTS_PROVIDER=disabled` (default): renders are refused before any narration.
 - `TTS_PROVIDER=fake` (local only): a 220 Hz tone per word at 2.6 words/s, so the whole render
   pipeline can be tested without a provider. It is obviously not a human voice.
-- No real provider adapter exists. Before adding one, check the provider's current official docs
-  for: commercial-use terms for the voices, data retention, Spanish (es-ES / es-419) quality, and
-  pricing; register each voice with its license in "Derechos" and have a rights reviewer approve
-  it.
+- `TTS_PROVIDER=google` with `TTS_CREDENTIALS_REF=vault://<uuid>`: Google Cloud Text-to-Speech.
+  Checked against the official docs on 2026-11-19:
+  - [`POST /v1/text:synthesize`](https://docs.cloud.google.com/text-to-speech/docs/reference/rest/v1/text/synthesize),
+    scope `cloud-platform`. We ask for `LINEAR16` at 24 kHz; the response includes the WAV header,
+    so the duration is read from it.
+  - Authentication: API keys are not documented for this API, so the worker signs a
+    [service-account JWT](https://developers.google.com/identity/protocols/oauth2/service-account)
+    (RS256, 1 hour) and caches the access token. The JSON key lives in Supabase Vault.
+  - [Quotas](https://docs.cloud.google.com/text-to-speech/quotas): 5,000 bytes of input per
+    request (longer lines are refused), Chirp 3 HD 200 requests/minute per project.
+  - [Chirp 3 HD](https://docs.cloud.google.com/text-to-speech/docs/chirp3-hd) covers `es-ES` and
+    `es-US`; voice names look like `es-ES-Chirp3-HD-<Name>`. Only `es-*` voices are accepted.
+  - [Pricing](https://cloud.google.com/text-to-speech/pricing): free monthly tier (1M characters
+    for Chirp 3 HD, 4M for Standard/WaveNet), then per character. The free tier is ignored by the
+    spend gate (we cannot see the account's usage): every call is priced at list price (USD read
+    as EUR), and the worst case (Studio) before the call. So a spend limit above 0 is needed.
+  - [Data logging](https://docs.cloud.google.com/text-to-speech/docs/data-logging): Google states it
+    does not log Cloud TTS text or audio.
+  - Not confirmed in the docs: commercial-use terms for the generated audio. The voice therefore
+    stays unusable until a rights reviewer records a license with commercial use in "Derechos"
+    after reading Google's terms, and approves the voice (rule 5). Every render with this voice
+    sets `disclosure_required`, so publications declare synthetic media.
+  - A lost synthesize call is `AMBIGUOUS_EXTERNAL_STATE` (it may have been billed; the gate records
+    the worst case). No retries inside the adapter.

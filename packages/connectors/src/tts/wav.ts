@@ -44,3 +44,38 @@ export function fakeSpeechSamples(
   }
   return samples;
 }
+
+/**
+ * Duration of a PCM WAV file from its header, walking the RIFF chunks (providers may add chunks
+ * such as LIST before "data"). Returns null when the bytes are not a readable WAV file.
+ */
+export function readWavDurationMs(bytes: Uint8Array): number | null {
+  if (bytes.length < 12) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const ascii = (offset: number) =>
+    String.fromCharCode(
+      bytes[offset] ?? 0,
+      bytes[offset + 1] ?? 0,
+      bytes[offset + 2] ?? 0,
+      bytes[offset + 3] ?? 0,
+    );
+  if (ascii(0) !== "RIFF" || ascii(8) !== "WAVE") return null;
+  let byteRate: number | null = null;
+  let offset = 12;
+  while (offset + 8 <= bytes.length) {
+    const id = ascii(offset);
+    const size = view.getUint32(offset + 4, true);
+    const body = offset + 8;
+    if (id === "fmt " && body + 12 <= bytes.length) {
+      byteRate = view.getUint32(body + 8, true);
+    } else if (id === "data") {
+      if (!byteRate) return null;
+      // Some encoders write 0 or 0xFFFFFFFF when streaming: use what is actually there.
+      const available = bytes.length - body;
+      const dataBytes = size === 0 || size > available ? available : size;
+      return Math.round((dataBytes / byteRate) * 1000);
+    }
+    offset = body + size + (size % 2);
+  }
+  return null;
+}
