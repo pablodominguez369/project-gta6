@@ -56,41 +56,46 @@ export function buildRenderArgs(input: RenderPlanInput): string[] {
     { durationMs: END_CARD_MS, background: null },
   ];
 
-  // Inputs 0..S-1: one visual per segment.
-  for (const segment of segments) {
+  // Visual inputs. FFmpeg 7 decodes every input ahead of time, so a looped image or a lavfi
+  // colour input queues every frame of a later scene in memory until concat reaches it (the
+  // worker was killed with SIGKILL). Images are therefore read as a single frame and repeated
+  // inside the graph with `loop`, and the brand colour is a graph source: both only produce
+  // frames when concat asks for them. Video backgrounds still need a real input.
+  const size = `${String(FRAME.width)}x${String(FRAME.height)}`;
+  const fit =
+    `scale=${String(FRAME.width)}:${String(FRAME.height)}:force_original_aspect_ratio=increase,` +
+    `crop=${String(FRAME.width)}:${String(FRAME.height)},setsar=1`;
+  const filters: string[] = [];
+  let nextInput = 0;
+  segments.forEach((segment, i) => {
     const d = seconds(segment.durationMs);
+    const out = `trim=duration=${d},setpts=PTS-STARTPTS[v${String(i)}]`;
     if (segment.background?.kind === "image") {
-      args.push("-loop", "1", "-framerate", String(FPS), "-t", d, "-i", segment.background.file);
+      args.push("-i", segment.background.file);
+      filters.push(
+        `[${String(nextInput)}:v]${fit},format=yuv420p,loop=loop=-1:size=1,` +
+          `setpts=N/(${String(FPS)}*TB),fps=${String(FPS)},${out}`,
+      );
+      nextInput += 1;
     } else if (segment.background?.kind === "video") {
       args.push("-stream_loop", "-1", "-t", d, "-i", segment.background.file);
+      filters.push(`[${String(nextInput)}:v]${fit},fps=${String(FPS)},format=yuv420p,${out}`);
+      nextInput += 1;
     } else {
-      args.push(
-        "-f",
-        "lavfi",
-        "-t",
-        d,
-        "-i",
-        `color=c=${BRAND_BACKGROUND}:s=${String(FRAME.width)}x${String(FRAME.height)}:r=${String(FPS)}`,
+      filters.push(
+        `color=c=${BRAND_BACKGROUND}:s=${size}:r=${String(FPS)}:d=${d},setsar=1,format=yuv420p,${out}`,
       );
     }
-  }
+  });
   // Next inputs: one narration file per scene, then the optional music. The closing card's
   // silence is generated inside the filter graph: as a separate lavfi input, FFmpeg 5.1 (Debian
   // 12) re-initialised the graph on its first frame and then failed to negotiate the channel
   // layout of the AAC output ("Cannot select channel layout").
-  const voiceBase = segments.length;
+  const voiceBase = nextInput;
   for (const file of input.voiceFiles) args.push("-i", file);
   const musicIndex = voiceBase + input.voiceFiles.length;
   if (input.musicFile) args.push("-stream_loop", "-1", "-i", input.musicFile);
 
-  const filters: string[] = [];
-  segments.forEach((segment, i) => {
-    filters.push(
-      `[${String(i)}:v]scale=${String(FRAME.width)}:${String(FRAME.height)}:force_original_aspect_ratio=increase,` +
-        `crop=${String(FRAME.width)}:${String(FRAME.height)},setsar=1,fps=${String(FPS)},format=yuv420p,` +
-        `trim=duration=${seconds(segment.durationMs)},setpts=PTS-STARTPTS[v${String(i)}]`,
-    );
-  });
   filters.push(
     `${segments.map((_, i) => `[v${String(i)}]`).join("")}concat=n=${String(segments.length)}:v=1:a=0[vcat]`,
   );
